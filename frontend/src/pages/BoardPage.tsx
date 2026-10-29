@@ -1,29 +1,41 @@
 import { DndContext, DragOverlay } from '@dnd-kit/core'
 import { horizontalListSortingStrategy, SortableContext } from '@dnd-kit/sortable'
 import { COLUMN_TITLE_MAX, type BoardDetail } from '@kanban/shared'
-import { useState } from 'react'
+import { Link, Outlet, useNavigate, useParams } from 'react-router'
 import { AddItemForm } from '@/components/AddItemForm'
 import { StatusMessage } from '@/components/StatusMessage'
-import { findCard } from '@/features/boards/boardReducer'
+import { newId, now } from '@/features/boards/actionValues'
+import type { BoardAction } from '@/features/boards/boardReducer'
 import { BoardHeader } from '@/features/boards/components/BoardHeader'
-import { useBoard } from '@/features/boards/queries'
+import { useBoard, useUpdateBoard } from '@/features/boards/queries'
 import { useBoardAction } from '@/features/boards/useBoardAction'
 import { useBoardDnd } from '@/features/boards/useBoardDnd'
-import { CardDetailModal } from '@/features/cards/components/CardDetailModal'
 import { CardPreview } from '@/features/cards/components/CardItem'
 import { BoardColumn, ColumnPreview } from '@/features/columns/components/BoardColumn'
+import { ApiError } from '@/lib/apiClient'
 
-// 楽観的更新で画面に先に出すための仮の ID と日時。
-// 保存に成功したあと、サーバーから取り直したデータ（本物の ID）に置き換わる
-const newId = () => crypto.randomUUID()
-const now = () => new Date().toISOString()
+// 子ルート（カード詳細）に渡す値。子では useOutletContext で受け取る
+export type BoardOutletContext = {
+  board: BoardDetail
+  run: (action: BoardAction) => void
+}
 
-export function BoardPage({ boardId }: { boardId: string }) {
+// /boards/:boardId（ボード）
+export function BoardPage() {
+  const { boardId = '' } = useParams()
   const query = useBoard(boardId)
 
   if (query.isPending) return <StatusMessage>読み込み中…</StatusMessage>
   if (query.isError) {
-    return <StatusMessage error={query.error} onRetry={() => query.refetch()} />
+    // 存在しないボードは、再読み込みしても見つからないので一覧に戻す
+    const notFound = query.error instanceof ApiError && query.error.status === 404
+    return (
+      <StatusMessage error={query.error} onRetry={notFound ? undefined : () => query.refetch()}>
+        <Link to="/" className="text-sky-700 underline">
+          ボード一覧に戻る
+        </Link>
+      </StatusMessage>
+    )
   }
   return <BoardView board={query.data} />
 }
@@ -33,16 +45,14 @@ export function BoardPage({ boardId }: { boardId: string }) {
 function BoardView({ board }: { board: BoardDetail }) {
   // Step 2〜3 の dispatch と同じ形で呼べる。中で画面の更新と API の呼び出しをする
   const run = useBoardAction(board.id)
+  const updateBoard = useUpdateBoard(board.id)
   // ドラッグ中は、カラムをまたいだ移動を反映した仮のボード（shownBoard）を表示する
   const { shownBoard, activeCard, activeColumn, contextProps } = useBoardDnd(board, run)
-  // カードのコピーではなく ID だけを持ち、表示するカードは board から毎回探す。
-  // こうすると、編集や削除の結果が自動で反映される
-  const [openCardId, setOpenCardId] = useState<string | null>(null)
-  const openCard = openCardId === null ? undefined : findCard(board, openCardId)
+  const navigate = useNavigate()
 
   return (
     <div className="flex h-dvh flex-col bg-slate-100">
-      <BoardHeader title={board.title} />
+      <BoardHeader title={board.title} onRename={(title) => updateBoard.mutate({ title })} />
       <DndContext {...contextProps}>
         <main className="flex min-h-0 flex-1 snap-x scroll-px-4 items-start gap-3 overflow-x-auto p-4">
           <SortableContext
@@ -60,7 +70,8 @@ function BoardView({ board }: { board: BoardDetail }) {
                 onAddCard={(title) =>
                   run({ type: 'addCard', id: newId(), columnId: column.id, title, now: now() })
                 }
-                onOpenCard={setOpenCardId}
+                // 開いているカードは URL で表す。リロードしても開いたままになり、URL を共有できる
+                onOpenCard={(cardId) => navigate(`/boards/${board.id}/cards/${cardId}`)}
               />
             ))}
           </SortableContext>
@@ -81,18 +92,8 @@ function BoardView({ board }: { board: BoardDetail }) {
         </DragOverlay>
       </DndContext>
 
-      {openCard && (
-        // key に card.id を渡すと、別のカードを開いたときにフォームの state が作り直される
-        <CardDetailModal
-          key={openCard.id}
-          card={openCard}
-          onSave={(changes) =>
-            run({ type: 'updateCard', cardId: openCard.id, ...changes, now: now() })
-          }
-          onDelete={() => run({ type: 'deleteCard', cardId: openCard.id })}
-          onClose={() => setOpenCardId(null)}
-        />
-      )}
+      {/* 子ルート（/boards/:boardId/cards/:cardId のカード詳細）がここに表示される */}
+      <Outlet context={{ board, run } satisfies BoardOutletContext} />
     </div>
   )
 }

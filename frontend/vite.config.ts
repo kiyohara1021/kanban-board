@@ -1,7 +1,8 @@
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { fileURLToPath } from 'node:url'
-import { defineConfig } from 'vite'
+// vitest/config の defineConfig は、Vite の設定に test の項目を加えたもの
+import { defineConfig } from 'vitest/config'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -16,5 +17,10 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:3000',
     },
+  },
+  test: {
+    // 画面のテストのため、ブラウザの代わりに jsdom で DOM を用意する
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
   },
 })

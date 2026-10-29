@@ -7,18 +7,20 @@
 ```
 frontend/src/
 ├── main.tsx                  エントリ（QueryClientProvider と RouterProvider を置く）
-├── router.tsx                ルート定義
+├── routes.tsx                ルート定義（アプリとテストで同じものを使う）
 ├── pages/
 │   ├── BoardListPage.tsx     /
-│   └── BoardPage.tsx         /boards/:boardId
+│   ├── BoardPage.tsx         /boards/:boardId
+│   └── CardDetailRoute.tsx   /boards/:boardId/cards/:cardId（BoardPage の子ルート）
 ├── features/
 │   ├── boards/
 │   │   ├── api.ts            fetch 関数（getBoards, getBoard, createBoard …）
-│   │   ├── queries.ts        取得のフック（useBoards, useBoard）とクエリキー
+│   │   ├── queries.ts        ボードの取得・作成・名前変更・削除のフックとクエリキー
 │   │   ├── boardReducer.ts   ボードを変更するアクションと reducer
+│   │   ├── actionValues.ts   アクションに入れる仮の ID と日時を作る関数
 │   │   ├── useBoardAction.ts アクションを楽観的更新つきで API に送るフック
 │   │   ├── useBoardDnd.ts    ドラッグ&ドロップの処理
-│   │   └── components/       BoardHeader（Step 6 で BoardTile, CreateBoardForm）
+│   │   └── components/       BoardHeader, BoardTile
 │   ├── columns/
 │   │   ├── api.ts
 │   │   └── components/       BoardColumn, ColumnHeader
@@ -29,11 +31,13 @@ frontend/src/
 │   ├── ui/                   shadcn/ui が生成した部品（button, dialog, sonner など）。直接は編集しない
 │   ├── AddItemForm.tsx       「+ ○○を追加」から入力欄に切り替わるフォーム
 │   ├── ConfirmDialog.tsx     削除前の確認ダイアログ（alert-dialog を使う）
-│   └── StatusMessage.tsx     読み込み中・エラー・データが空のときの表示
-└── lib/
-    ├── utils.ts              shadcn/ui が使う cn()（クラス名の結合）
-    ├── apiClient.ts          fetch の共通処理（ベース URL、エラー変換）
-    └── queryClient.ts        TanStack Query の設定
+│   ├── InlineEdit.tsx        見出しをクリックしてその場で名前を変える部品（ボード名・カラム名）
+│   └── StatusMessage.tsx     読み込み中・エラー・ページが見つからないときの表示
+├── lib/
+│   ├── utils.ts              shadcn/ui が使う cn()（クラス名の結合）
+│   ├── apiClient.ts          fetch の共通処理（ベース URL、エラー変換）
+│   └── queryClient.ts        TanStack Query の設定
+└── test/setup.ts             テストの初期設定（jest-dom の読み込み、画面の片付け）
 ```
 
 - Step 1〜3（API なし）の間は `api.ts` と `queries.ts` を作らず、`features/boards/boardReducer.ts` で状態を管理する
@@ -45,11 +49,11 @@ frontend/src/
 
 ```
 BoardListPage
-├── CreateBoardForm
-└── BoardTile × n
+├── BoardTile × n           クリックでボードを開く。× で削除（ConfirmDialog）
+└── AddItemForm             ボードの作成。作ったらそのボードを開く
 
 BoardPage
-├── BoardHeader             タイトル表示とインライン編集
+├── BoardHeader             一覧に戻るリンクと、ボード名のインライン編集（InlineEdit）
 ├── DndContext              dnd-kit のドラッグ範囲（設定は useBoardDnd が返す）
 │   ├── SortableContext     カラムの並び（横方向）
 │   │   └── BoardColumn × n カラム自体も並び替えられる
@@ -59,7 +63,7 @@ BoardPage
 │   │       └── AddItemForm     カードの追加
 │   ├── AddItemForm         カラムの追加
 │   └── DragOverlay         ドラッグ中に指やマウスに付いていく表示（CardPreview / ColumnPreview）
-└── CardDetailModal         URL に :cardId があるときだけ表示
+└── <Outlet />              子ルート。URL に /cards/:cardId があるときだけ CardDetailRoute → CardDetailModal
 ```
 
 ## 状態をどこに置くか
@@ -94,7 +98,7 @@ type BoardAction =
 - 新しい ID（`id`）と日時（`now`）はイベントハンドラーで作ってアクションに入れる。reducer の中で `crypto.randomUUID()` や `new Date()` を呼ぶと純粋な関数でなくなり、StrictMode で reducer が2回呼ばれたときに結果がずれる
 - 変更しないカラムは同じオブジェクトのまま返す。`memo` で再描画を省くときに、この「参照が変わっていない」ことが前提になる
 - `moveColumn` と `moveCard` の引数は、API の `/move` と同じ形にしておく。Step 5 で API に置き換えるときに、呼び出し側を変えずに済む
-- Step 1〜3 で開いているカードは、URL ではなく `BoardPage` の `useState` に ID だけを持つ。Step 6 で URL に移す
+- Step 1〜5 では、開いているカードを `BoardPage` の `useState` に ID だけで持っていた。Step 6 で URL に移した
 
 ### 別案：正規化した状態
 
@@ -154,19 +158,19 @@ type NormalizedBoard = {
 | `["boards"]`          | ボード一覧                         |
 | `["boards", boardId]` | ボード詳細（カラムとカードを含む） |
 
-キーは `features/boards/queries.ts` の `boardKeys` にまとめる。カード単体の `["cards", cardId]` は、URL からカード詳細を直接開く Step 6 で追加する。
+キーは `features/boards/queries.ts` の `boardKeys` にまとめる。
+
+当初はカード単体の `["cards", cardId]` も用意する予定だったが、ボード詳細にカードが含まれているので使っていない（Step 6 を参照）。
 
 ### ファイルの分け方
 
-| ファイル                            | 役割                                                            |
-| ----------------------------------- | --------------------------------------------------------------- |
-| `lib/apiClient.ts`                  | `apiFetch`：`/api` を付けて送り、エラーを `ApiError` に変える   |
-| `lib/queryClient.ts`                | `QueryClient` の設定（`staleTime` 10秒、再試行1回）             |
-| `features/*/api.ts`                 | エンドポイントごとの関数（`getBoard`、`moveCard` など）         |
-| `features/boards/queries.ts`        | 取得のフック（`useBoards`、`useBoard`）とボードの作成           |
-| `features/boards/useBoardAction.ts` | ボードを変更するアクションを、楽観的更新つきで API に送るフック |
-
-Step 6 で React Router を入れるまでは、`App.tsx` がボード一覧の最初のボードを表示する。ボードが1つもないときは作成フォームを出す。
+| ファイル                            | 役割                                                                 |
+| ----------------------------------- | -------------------------------------------------------------------- |
+| `lib/apiClient.ts`                  | `apiFetch`：`/api` を付けて送り、エラーを `ApiError` に変える        |
+| `lib/queryClient.ts`                | `QueryClient` の設定（`staleTime` 10秒、再試行は 5xx のとき1回だけ） |
+| `features/*/api.ts`                 | エンドポイントごとの関数（`getBoard`、`moveCard` など）              |
+| `features/boards/queries.ts`        | ボードの取得・作成・名前変更・削除のフック                           |
+| `features/boards/useBoardAction.ts` | ボードを変更するアクションを、楽観的更新つきで API に送るフック      |
 
 ### すべての変更を楽観的更新にする
 
@@ -183,6 +187,37 @@ Step 6 で React Router を入れるまでは、`App.tsx` がボード一覧の�
 
 - 追加したカードやカラムは、保存が終わって取り直すまでの短い間、画面で作った仮の ID を持つ。この間にそのカードを編集すると、サーバーにない ID なので 404 になる
 - 取得してから10秒たったデータは、画面にフォーカスが戻ったときなどに自動で取り直す。別のタブで削除されたカードは、そのときに画面から消える
+
+## Step 6：ルーティングとテスト
+
+### ルート
+
+`routes.tsx` に定義し、`main.tsx` では `createBrowserRouter`（ブラウザの URL）、テストでは `createMemoryRouter`（メモリ上の URL）に同じ定義を渡す。
+
+| パス                             | コンポーネント    | 内容                                                       |
+| -------------------------------- | ----------------- | ---------------------------------------------------------- |
+| `/`                              | `BoardListPage`   | ボードの一覧・作成・削除                                   |
+| `/boards/:boardId`               | `BoardPage`       | ボード。ボード名をクリックすると名前を変えられる           |
+| `/boards/:boardId/cards/:cardId` | `CardDetailRoute` | `BoardPage` の子ルート。ボードの上にカード詳細を重ねて出す |
+| `*`                              | -                 | 「ページが見つかりません」                                 |
+
+### カード詳細を子ルートにする
+
+- `BoardPage` は取得したボードと `run` を `<Outlet context={...} />` で子に渡し、`CardDetailRoute` は `useOutletContext` で受け取る。カードの情報はボード詳細に含まれているので、カード単体の API は呼ばない
+- カードを開くと URL が `/cards/:cardId` に変わる。ブラウザの「戻る」で閉じ、「進む」で開き直せる。URL を直接開いても、リロードしても開いたままになる
+- 存在しないカードの URL（削除されたカードなど）は、`<Navigate replace />` でボードに戻す。`replace` にすると、「戻る」でその URL に戻ってこない
+
+### エラーの表示
+
+- 存在しないボード（404）は「ボードが見つかりません」と一覧へのリンクを出す。何度読み込んでも結果は変わらないので、再読み込みボタンは出さない
+- 4xx のエラーは自動で再試行しない（`lib/queryClient.ts`）
+
+### 画面のテスト（React Testing Library）
+
+- `vite.config.ts` の `test.environment` を `jsdom` にして、Node の上で DOM を使えるようにする
+- 要素は、画面に見えている文字や役割（`getByRole('button', { name: '追加' })` など）で探す。利用者と同じ見え方でテストするため、クラス名や内部の構造には頼らない
+- 操作は `userEvent` で、クリックやキー入力を実際の順番どおりに起こす。日本語入力の変換中の Enter（`isComposing`）だけは `userEvent` で再現できないので `fireEvent` を使う
+- `routes.test.tsx` では fetch を偽物に差し替え、ボード一覧からの作成、カードの URL を直接開く、存在しない URL、を確かめる
 
 ## スタイル
 
