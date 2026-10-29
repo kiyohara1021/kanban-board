@@ -48,13 +48,15 @@ BoardListPage
 
 BoardPage
 ├── BoardHeader             タイトル表示とインライン編集
-├── DndContext              dnd-kit のドラッグ範囲
-│   ├── BoardColumn × n
-│   │   ├── ColumnHeader    タイトルのインライン編集、削除ボタン（ConfirmDialog）
-│   │   ├── CardItem × n    クリックで CardDetailModal を開く
-│   │   └── AddItemForm     カードの追加
+├── DndContext              dnd-kit のドラッグ範囲（設定は useBoardDnd が返す）
+│   ├── SortableContext     カラムの並び（横方向）
+│   │   └── BoardColumn × n カラム自体も並び替えられる
+│   │       ├── ColumnHeader    ドラッグ用の取っ手、タイトルのインライン編集、削除ボタン（ConfirmDialog）
+│   │       ├── SortableContext カードの並び（縦方向）。id はカラムの ID
+│   │       │   └── CardItem × n  クリックか Enter で CardDetailModal を開く
+│   │       └── AddItemForm     カードの追加
 │   ├── AddItemForm         カラムの追加
-│   └── DragOverlay         ドラッグ中に指に追従する表示
+│   └── DragOverlay         ドラッグ中に指やマウスに付いていく表示（CardPreview / ColumnPreview）
 └── CardDetailModal         URL に :cardId があるときだけ表示
 ```
 
@@ -64,7 +66,7 @@ BoardPage
 | ------------------------------ | --------------------------- | -------------------------------------------------------- |
 | ボード・カラム・カードのデータ | TanStack Query のキャッシュ | サーバーのデータなので、取得・キャッシュ・再取得を任せる |
 | 開いているカード               | URL（`/cards/:cardId`）     | リロードや共有に対応できる                               |
-| ドラッグ中のカード ID          | `BoardPage` の `useState`   | ドラッグ中だけ使う一時的な状態                           |
+| ドラッグ中の ID と仮のボード   | `useBoardDnd` の `useState` | ドラッグ中だけ使う一時的な状態                           |
 | フォームの入力値               | 各フォームの `useState`     | そのコンポーネントの中でしか使わない                     |
 
 アプリ全体で共有する UI の状態がないため、MVP では Zustand などは使わない。
@@ -83,8 +85,8 @@ type BoardAction =
   | { type: 'updateCard'; cardId: string; title?: string; description?: string; now: string }
   | { type: 'deleteCard'; cardId: string }
   // Step 3
-  | { type: 'moveColumn'; columnId: string; index: number }
-  | { type: 'moveCard'; cardId: string; toColumnId: string; index: number }
+  | { type: 'moveColumn'; columnId: string; index: number; now: string }
+  | { type: 'moveCard'; cardId: string; toColumnId: string; index: number; now: string }
 ```
 
 - 新しい ID（`id`）と日時（`now`）はイベントハンドラーで作ってアクションに入れる。reducer の中で `crypto.randomUUID()` や `new Date()` を呼ぶと純粋な関数でなくなり、StrictMode で reducer が2回呼ばれたときに結果がずれる
@@ -108,6 +110,38 @@ type NormalizedBoard = {
 - 欠点：API のレスポンスを変換する処理が必要になる
 
 まずは入れ子のまま作り、更新処理が書きにくいと感じたらこの形に作り直してみると、正規化の効果を実感しやすい。
+
+## Step 3：ドラッグ&ドロップ
+
+`@dnd-kit/core` と `@dnd-kit/sortable`（安定版）を使う。後継の `@dnd-kit/react` はまだ 0.x のため使わない。ドラッグに関する処理は、カスタムフック `features/boards/useBoardDnd.ts` にまとめる。
+
+### 並び順の計算
+
+`features/boards/position.ts` の `positionForInsert(items, index)` で計算する（[データモデル](02-data-model.md)のルールどおり）。React に依存しない関数なので、Step 4 でバックエンドからも使う。
+
+### 仮のボード（dragBoard）
+
+- カードを別のカラムの上に動かしたとき（`onDragOver`）は、ドラッグ中だけ使う仮のボードの中でカードを移し、画面に映す
+- 本物のボードは、ドロップしたとき（`onDragEnd`）に `moveCard` を1回だけ dispatch して更新する。Step 5 では、ここが API 呼び出し1回になる
+- 同じカラムの中の並び替えは、dnd-kit が見た目（`transform`）だけずらしてくれるので、ドロップまで何もしない
+
+### 操作方法
+
+| 操作       | ドラッグの始め方                                               | 補足                                                    |
+| ---------- | -------------------------------------------------------------- | ------------------------------------------------------- |
+| マウス     | 5px 以上動かす                                                 | それより小さい動きはクリック（カードを開く）として扱う  |
+| タッチ     | 250ms 長押し                                                   | すぐ指を動かしたときは横スクロールになる                |
+| キーボード | Space で持ち上げ、矢印キーで移動、Space で置く、Esc で取り消し | Enter はカードを開くのに使う。←→ キーで隣のカラムへ移る |
+
+カラムは、見出しの左にある取っ手（⋮⋮）だけでドラッグする。見出しのクリックは名前の変更に使うため。
+
+### つまずいた点
+
+- **カラムを移った直後の行ったり来たり**：移った直後は要素の位置の測り直しが間に合わず、古い位置で判定すると元のカラムに戻され、無限ループになる。移った直後の1フレームは判定を止める（`movedToNewColumnRef`）
+- **キーボードで高さの違うカードを飛び越える**：重なりの大きさで判定すると、1つ下ではなく2つ下が選ばれることがある。キーボードのときは角の近さ（`closestCorners`）で判定する
+- **キーボードで隣のカラムに移れない**：標準の `sortableKeyboardCoordinates` は1つのリストの中の移動を前提にしているので、←→ キーのときだけ「隣のカラムの先頭」を返す独自の関数を使う
+- **ドロップ後にフォーカスが外れる**：`setActivatorNodeRef` でドラッグを始めた要素を教えておくと、dnd-kit がそこにフォーカスを戻す
+- **Enter でカードを開くと、すぐ閉じる**：同じ Enter が、開いたダイアログの入力欄に届いてフォームの送信になっていた。`event.preventDefault()` で止める
 
 ## Step 5：TanStack Query
 

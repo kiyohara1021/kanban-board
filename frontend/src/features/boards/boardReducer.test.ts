@@ -133,4 +133,103 @@ describe('boardReducer', () => {
       expect(next.columns[0].cards.map((card) => card.id)).toEqual(['card-1', 'card-3'])
     })
   })
+
+  describe('moveCard', () => {
+    const cardIds = (board: BoardDetail, columnIndex: number) =>
+      board.columns[columnIndex].cards.map((card) => card.id)
+
+    it('同じカラムの中で並び替える', () => {
+      const board = createBoard()
+      const next = boardReducer(board, {
+        type: 'moveCard',
+        cardId: 'card-1',
+        toColumnId: 'column-1',
+        index: 2,
+        now,
+      })
+
+      expect(cardIds(next, 0)).toEqual(['card-2', 'card-3', 'card-1'])
+      expect(findCard(next, 'card-1')?.position).toBe(4000)
+    })
+
+    it('別のカラムのカードの間に移動する', () => {
+      const board = createBoard()
+      const next = boardReducer(board, {
+        type: 'moveCard',
+        cardId: 'card-1',
+        toColumnId: 'column-3',
+        index: 1,
+        now,
+      })
+
+      expect(cardIds(next, 0)).toEqual(['card-2', 'card-3'])
+      expect(cardIds(next, 2)).toEqual(['card-5', 'card-1', 'card-6'])
+      expect(findCard(next, 'card-1')).toMatchObject({
+        columnId: 'column-3',
+        position: 1500,
+        updatedAt: now,
+      })
+      // 関係のないカラムは同じオブジェクトのまま
+      expect(next.columns[1]).toBe(board.columns[1])
+    })
+
+    it('空のカラムに移動する', () => {
+      const board = createBoard()
+      const next = boardReducer(board, {
+        type: 'moveCard',
+        cardId: 'card-2',
+        toColumnId: 'column-4',
+        index: 0,
+        now,
+      })
+
+      expect(cardIds(next, 3)).toEqual(['card-2'])
+      expect(findCard(next, 'card-2')?.position).toBe(1000)
+    })
+
+    it('同じ場所に落としたときは、元の state をそのまま返す', () => {
+      const board = createBoard()
+      const next = boardReducer(board, {
+        type: 'moveCard',
+        cardId: 'card-2',
+        toColumnId: 'column-1',
+        index: 1,
+        now,
+      })
+
+      expect(next).toBe(board)
+    })
+  })
+
+  describe('moveColumn', () => {
+    it('カラムを先頭に移動する', () => {
+      const board = createBoard()
+      const next = boardReducer(board, {
+        type: 'moveColumn',
+        columnId: 'column-4',
+        index: 0,
+        now,
+      })
+
+      expect(next.columns.map((column) => column.id)).toEqual([
+        'column-4',
+        'column-1',
+        'column-2',
+        'column-3',
+      ])
+      expect(next.columns[0].position).toBe(500)
+    })
+
+    it('同じ場所に落としたときは、元の state をそのまま返す', () => {
+      const board = createBoard()
+      const next = boardReducer(board, {
+        type: 'moveColumn',
+        columnId: 'column-2',
+        index: 1,
+        now,
+      })
+
+      expect(next).toBe(board)
+    })
+  })
 })

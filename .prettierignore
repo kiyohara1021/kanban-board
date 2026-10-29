@@ -1,2 +1,4 @@
 package-lock.json
 dist
+# prisma generate で作られるファイル
+backend/prisma/generated

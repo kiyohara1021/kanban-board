@@ -1,5 +1,5 @@
 import { X } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,9 +10,11 @@ type Props = {
   cardCount: number
   onRename: (title: string) => void
   onDelete: () => void
+  // カラムをドラッグする取っ手。ドラッグの仕組みは BoardColumn が持ち、ここでは置く場所だけ決める
+  dragHandle: ReactNode
 }
 
-export function ColumnHeader({ title, cardCount, onRename, onDelete }: Props) {
+export function ColumnHeader({ title, cardCount, onRename, onDelete, dragHandle }: Props) {
   const [isEditing, setIsEditing] = useState(false)
   const [draft, setDraft] = useState(title)
   // Esc で取り消したかどうか。画面の表示には使わないので state ではなく ref に持つ
@@ -33,6 +35,7 @@ export function ColumnHeader({ title, cardCount, onRename, onDelete }: Props) {
 
   return (
     <div className="flex items-center gap-1">
+      {dragHandle}
       {isEditing ? (
         <Input
           autoFocus
