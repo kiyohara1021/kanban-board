@@ -1,24 +1,40 @@
 import { DndContext, DragOverlay } from '@dnd-kit/core'
 import { horizontalListSortingStrategy, SortableContext } from '@dnd-kit/sortable'
-import { useReducer, useState } from 'react'
+import { COLUMN_TITLE_MAX, type BoardDetail } from '@kanban/shared'
+import { useState } from 'react'
 import { AddItemForm } from '@/components/AddItemForm'
-import { boardReducer, findCard } from '@/features/boards/boardReducer'
+import { StatusMessage } from '@/components/StatusMessage'
+import { findCard } from '@/features/boards/boardReducer'
 import { BoardHeader } from '@/features/boards/components/BoardHeader'
-import { COLUMN_TITLE_MAX } from '@kanban/shared'
-import { mockBoard } from '@/features/boards/mockBoard'
+import { useBoard } from '@/features/boards/queries'
+import { useBoardAction } from '@/features/boards/useBoardAction'
 import { useBoardDnd } from '@/features/boards/useBoardDnd'
 import { CardDetailModal } from '@/features/cards/components/CardDetailModal'
 import { CardPreview } from '@/features/cards/components/CardItem'
 import { BoardColumn, ColumnPreview } from '@/features/columns/components/BoardColumn'
 
-// ID と日時はイベントハンドラーで作り、アクションに入れて reducer に渡す
+// 楽観的更新で画面に先に出すための仮の ID と日時。
+// 保存に成功したあと、サーバーから取り直したデータ（本物の ID）に置き換わる
 const newId = () => crypto.randomUUID()
 const now = () => new Date().toISOString()
 
-export function BoardPage() {
-  const [board, dispatch] = useReducer(boardReducer, mockBoard)
+export function BoardPage({ boardId }: { boardId: string }) {
+  const query = useBoard(boardId)
+
+  if (query.isPending) return <StatusMessage>読み込み中…</StatusMessage>
+  if (query.isError) {
+    return <StatusMessage error={query.error} onRetry={() => query.refetch()} />
+  }
+  return <BoardView board={query.data} />
+}
+
+// データの取得が終わってから描画する部分。
+// フックは条件分岐より前に呼ぶ必要があるため、取得（BoardPage）と表示（BoardView）を分けている
+function BoardView({ board }: { board: BoardDetail }) {
+  // Step 2〜3 の dispatch と同じ形で呼べる。中で画面の更新と API の呼び出しをする
+  const run = useBoardAction(board.id)
   // ドラッグ中は、カラムをまたいだ移動を反映した仮のボード（shownBoard）を表示する
-  const { shownBoard, activeCard, activeColumn, contextProps } = useBoardDnd(board, dispatch)
+  const { shownBoard, activeCard, activeColumn, contextProps } = useBoardDnd(board, run)
   // カードのコピーではなく ID だけを持ち、表示するカードは board から毎回探す。
   // こうすると、編集や削除の結果が自動で反映される
   const [openCardId, setOpenCardId] = useState<string | null>(null)
@@ -38,11 +54,11 @@ export function BoardPage() {
                 key={column.id}
                 column={column}
                 onRename={(title) =>
-                  dispatch({ type: 'renameColumn', columnId: column.id, title, now: now() })
+                  run({ type: 'renameColumn', columnId: column.id, title, now: now() })
                 }
-                onDelete={() => dispatch({ type: 'deleteColumn', columnId: column.id })}
+                onDelete={() => run({ type: 'deleteColumn', columnId: column.id })}
                 onAddCard={(title) =>
-                  dispatch({ type: 'addCard', id: newId(), columnId: column.id, title, now: now() })
+                  run({ type: 'addCard', id: newId(), columnId: column.id, title, now: now() })
                 }
                 onOpenCard={setOpenCardId}
               />
@@ -53,7 +69,7 @@ export function BoardPage() {
               label="カラムを追加"
               placeholder="カラム名"
               maxLength={COLUMN_TITLE_MAX}
-              onAdd={(title) => dispatch({ type: 'addColumn', id: newId(), title, now: now() })}
+              onAdd={(title) => run({ type: 'addColumn', id: newId(), title, now: now() })}
             />
           </div>
         </main>
@@ -71,9 +87,9 @@ export function BoardPage() {
           key={openCard.id}
           card={openCard}
           onSave={(changes) =>
-            dispatch({ type: 'updateCard', cardId: openCard.id, ...changes, now: now() })
+            run({ type: 'updateCard', cardId: openCard.id, ...changes, now: now() })
           }
-          onDelete={() => dispatch({ type: 'deleteCard', cardId: openCard.id })}
+          onDelete={() => run({ type: 'deleteCard', cardId: openCard.id })}
           onClose={() => setOpenCardId(null)}
         />
       )}

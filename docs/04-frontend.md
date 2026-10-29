@@ -13,29 +13,31 @@ frontend/src/
 │   └── BoardPage.tsx         /boards/:boardId
 ├── features/
 │   ├── boards/
-│   │   ├── api.ts            fetch 関数（getBoards, createBoard …）
-│   │   ├── queries.ts        TanStack Query のフック（useBoards, useCreateBoard …）
-│   │   └── components/       BoardTile, CreateBoardForm, BoardHeader
+│   │   ├── api.ts            fetch 関数（getBoards, getBoard, createBoard …）
+│   │   ├── queries.ts        取得のフック（useBoards, useBoard）とクエリキー
+│   │   ├── boardReducer.ts   ボードを変更するアクションと reducer
+│   │   ├── useBoardAction.ts アクションを楽観的更新つきで API に送るフック
+│   │   ├── useBoardDnd.ts    ドラッグ&ドロップの処理
+│   │   └── components/       BoardHeader（Step 6 で BoardTile, CreateBoardForm）
 │   ├── columns/
 │   │   ├── api.ts
-│   │   ├── queries.ts
 │   │   └── components/       BoardColumn, ColumnHeader
 │   └── cards/
 │       ├── api.ts
-│       ├── queries.ts
 │       └── components/       CardItem, CardDetailModal
 ├── components/
-│   ├── ui/                   shadcn/ui が生成した部品（button, dialog など）。直接は編集しない
+│   ├── ui/                   shadcn/ui が生成した部品（button, dialog, sonner など）。直接は編集しない
 │   ├── AddItemForm.tsx       「+ ○○を追加」から入力欄に切り替わるフォーム
-│   └── ConfirmDialog.tsx     削除前の確認ダイアログ（alert-dialog を使う）
-├── lib/
-│   ├── utils.ts              shadcn/ui が使う cn()（クラス名の結合）
-│   ├── apiClient.ts          fetch の共通処理（ベース URL、エラー変換）
-│   └── queryClient.ts
-└── test/setup.ts             テストの初期設定
+│   ├── ConfirmDialog.tsx     削除前の確認ダイアログ（alert-dialog を使う）
+│   └── StatusMessage.tsx     読み込み中・エラー・データが空のときの表示
+└── lib/
+    ├── utils.ts              shadcn/ui が使う cn()（クラス名の結合）
+    ├── apiClient.ts          fetch の共通処理（ベース URL、エラー変換）
+    └── queryClient.ts        TanStack Query の設定
 ```
 
 - Step 1〜3（API なし）の間は `api.ts` と `queries.ts` を作らず、`features/boards/boardReducer.ts` で状態を管理する
+- Step 5 からは、カラムとカードの変更もすべて `useBoardAction` を通すので、`columns/` と `cards/` には `queries.ts` を作らない
 - import は `@/`（`src/` を指す別名）で書く。例：`import { Button } from '@/components/ui/button'`
 - `components/ui/` は shadcn/ui のコマンドで追加・更新するファイルなので、lint の対象から外している。見た目を変えたいときは、使う側で `className` を渡す
 
@@ -151,17 +153,36 @@ type NormalizedBoard = {
 | --------------------- | ---------------------------------- |
 | `["boards"]`          | ボード一覧                         |
 | `["boards", boardId]` | ボード詳細（カラムとカードを含む） |
-| `["cards", cardId]`   | カード単体（詳細モーダル用）       |
 
-カラムやカードを変更したら、`["boards", boardId]` を無効化（invalidate）して再取得する。
+キーは `features/boards/queries.ts` の `boardKeys` にまとめる。カード単体の `["cards", cardId]` は、URL からカード詳細を直接開く Step 6 で追加する。
 
-### ドラッグ&ドロップの楽観的更新
+### ファイルの分け方
 
-ドロップした瞬間に画面を更新し、API の結果を待たない。
+| ファイル                            | 役割                                                            |
+| ----------------------------------- | --------------------------------------------------------------- |
+| `lib/apiClient.ts`                  | `apiFetch`：`/api` を付けて送り、エラーを `ApiError` に変える   |
+| `lib/queryClient.ts`                | `QueryClient` の設定（`staleTime` 10秒、再試行1回）             |
+| `features/*/api.ts`                 | エンドポイントごとの関数（`getBoard`、`moveCard` など）         |
+| `features/boards/queries.ts`        | 取得のフック（`useBoards`、`useBoard`）とボードの作成           |
+| `features/boards/useBoardAction.ts` | ボードを変更するアクションを、楽観的更新つきで API に送るフック |
 
-1. `onMutate`：進行中の取得をキャンセルし、今のキャッシュを保存してから、キャッシュ上でカードを移動する
-2. `onError`：保存しておいたキャッシュに戻し、エラーを通知する
-3. `onSettled`：`["boards", boardId]` を無効化して、サーバーの状態と合わせる
+Step 6 で React Router を入れるまでは、`App.tsx` がボード一覧の最初のボードを表示する。ボードが1つもないときは作成フォームを出す。
+
+### すべての変更を楽観的更新にする
+
+当初はドラッグ&ドロップだけを楽観的更新にする予定だったが、Step 2〜3 の `boardReducer` がそのまま使えるので、カード・カラムの追加・編集・削除・移動をすべて同じ仕組みにした。画面からは、Step 2〜3 の `dispatch` と同じ形で `run(action)` を呼ぶだけでよい。
+
+1. `onMutate`：進行中の取得をキャンセルし、今のキャッシュを保存してから、`boardReducer` でキャッシュを書き換える（画面がすぐ変わる）
+2. `mutationFn`：アクションを対応する API の呼び出しに変えて送る（`sendAction`）。アクションの形を API と揃えておいたので、ほぼそのまま渡せる
+3. `onError`：保存しておいたキャッシュに戻し、サーバーのエラーメッセージを通知（sonner）で出す
+4. `onSettled`：`["boards", boardId]` を無効化して、サーバーの状態と合わせる。ただし、続けて操作して別の変更がまだ送信中のときは、最後の1件が終わるまで待つ（途中で取り直すと、送信中の変更が一瞬元に戻って見えるため）
+
+ドラッグ中は、Step 3 の仮のボード（`dragBoard`）で見た目だけを動かし、ドロップしたときに `run` を1回だけ呼ぶ。そのため、API の呼び出しはドロップ1回につき1回で済む。
+
+### 注意点
+
+- 追加したカードやカラムは、保存が終わって取り直すまでの短い間、画面で作った仮の ID を持つ。この間にそのカードを編集すると、サーバーにない ID なので 404 になる
+- 取得してから10秒たったデータは、画面にフォーカスが戻ったときなどに自動で取り直す。別のタブで削除されたカードは、そのときに画面から消える
 
 ## スタイル
 
