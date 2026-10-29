@@ -1,0 +1,107 @@
+import type { BoardDetail } from './types'
+
+// Step 1〜3 で使う固定データ。API と同じく、カラムとカードは position の昇順に並べておく
+const now = '2026-10-30T00:00:00.000Z'
+
+export const mockBoard: BoardDetail = {
+  id: 'board-1',
+  title: 'マイボード',
+  createdAt: now,
+  updatedAt: now,
+  columns: [
+    {
+      id: 'column-1',
+      boardId: 'board-1',
+      title: 'ToDo',
+      position: 1000,
+      createdAt: now,
+      updatedAt: now,
+      cards: [
+        {
+          id: 'card-1',
+          columnId: 'column-1',
+          title: 'useReducer でカードを追加できるようにする',
+          description: 'Step 2。addCard アクションを作り、フォームから dispatch する。',
+          position: 1000,
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          id: 'card-2',
+          columnId: 'column-1',
+          title: 'dnd-kit でカードを移動する',
+          description: '',
+          position: 2000,
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          id: 'card-3',
+          columnId: 'column-1',
+          title: 'Express で API を作る',
+          description: 'docs/03-api.md のエンドポイント一覧どおりに実装する。',
+          position: 3000,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    },
+    {
+      id: 'column-2',
+      boardId: 'board-1',
+      title: '進行中',
+      position: 2000,
+      createdAt: now,
+      updatedAt: now,
+      cards: [
+        {
+          id: 'card-4',
+          columnId: 'column-2',
+          title: '固定データでボードを表示する',
+          description:
+            'Step 1。BoardPage → BoardColumn → CardItem とコンポーネントを分け、props でデータを渡す。',
+          position: 1000,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    },
+    {
+      id: 'column-3',
+      boardId: 'board-1',
+      title: '完了',
+      position: 3000,
+      createdAt: now,
+      updatedAt: now,
+      cards: [
+        {
+          id: 'card-5',
+          columnId: 'column-3',
+          title: 'API とデータモデルを設計する',
+          description: '',
+          position: 1000,
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          id: 'card-6',
+          columnId: 'column-3',
+          title: 'Vite で雛形を作る',
+          description: '',
+          position: 2000,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    },
+    {
+      id: 'column-4',
+      boardId: 'board-1',
+      title: '保留',
+      position: 4000,
+      createdAt: now,
+      updatedAt: now,
+      cards: [],
+    },
+  ],
+}
