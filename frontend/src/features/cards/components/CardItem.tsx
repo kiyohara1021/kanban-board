@@ -1,6 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import type { Card } from '@/features/boards/types'
+import type { Card } from '@kanban/shared'
 import type { DragData } from '@/features/boards/useBoardDnd'
 import { cn } from '@/lib/utils'
 

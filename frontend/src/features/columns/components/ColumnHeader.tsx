@@ -3,7 +3,7 @@ import { useRef, useState, type ReactNode } from 'react'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { COLUMN_TITLE_MAX } from '@/features/boards/limits'
+import { COLUMN_TITLE_MAX } from '@kanban/shared'
 
 type Props = {
   title: string

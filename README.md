@@ -20,19 +20,22 @@ Node.js 24 以上が必要。
 ```bash
 npm install
 npm run db:migrate -w backend
+npm run db:seed -w backend
 npm run dev
 ```
 
 - `npm run db:migrate -w backend` は初回だけ実行する。SQLite のデータベース（`backend/prisma/dev.db`）が作られる
+- `npm run db:seed -w backend` でサンプルのボードを入れる。実行するたびに、DB の中身がサンプルの状態に戻る
 - `npm run dev` でフロントエンドとバックエンドが同時に起動する。http://localhost:5173 を開く
 
-| コマンド               | 内容                                                 |
-| ---------------------- | ---------------------------------------------------- |
-| `npm test`             | テスト（Vitest）                                     |
-| `npm run build`        | フロントのビルドと、フロント・バック両方の型チェック |
-| `npm run lint`         | lint（oxlint）                                       |
-| `npm run format`       | 整形（Prettier）                                     |
-| `npm run format:check` | 整形されているかの確認（CI で使う）                  |
+| コマンド                       | 内容                                                                  |
+| ------------------------------ | --------------------------------------------------------------------- |
+| `npm test`                     | 3つのパッケージのテスト（Vitest。backend は Supertest で API を試す） |
+| `npm run build`                | フロントのビルドと、3つのパッケージの型チェック                       |
+| `npm run lint`                 | lint（oxlint）                                                        |
+| `npm run format`               | 整形（Prettier）                                                      |
+| `npm run format:check`         | 整形されているかの確認（CI で使う）                                   |
+| `npm run db:studio -w backend` | ブラウザで DB の中身を見る（Prisma Studio）                           |
 
 ## ディレクトリ構成
 
@@ -42,10 +45,9 @@ kanban-board/
 ├── docs/          設計ドキュメント
 ├── frontend/      React アプリ（Vite の react-ts テンプレートから作成）
 ├── backend/       API サーバー（Prisma 公式の Express テンプレートから作成）
+├── shared/        フロントとバックで共有する Zod スキーマ・型・並び順の計算（@kanban/shared）
 └── package.json   npm workspaces のルート
 ```
-
-フロントとバックで共有する `shared/`（Zod スキーマ・型）は Step 4 で追加する。
 
 ## テンプレートから作ったもの
 

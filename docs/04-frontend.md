@@ -117,7 +117,7 @@ type NormalizedBoard = {
 
 ### 並び順の計算
 
-`features/boards/position.ts` の `positionForInsert(items, index)` で計算する（[データモデル](02-data-model.md)のルールどおり）。React に依存しない関数なので、Step 4 でバックエンドからも使う。
+`@kanban/shared` の `positionForInsert(items, index)` で計算する（[データモデル](02-data-model.md)のルールどおり）。React に依存しない関数なので、バックエンドも同じ関数で保存する値を計算する。
 
 ### 仮のボード（dragBoard）
 

@@ -1,5 +1,9 @@
-import { positionForInsert } from './position'
-import type { BoardDetail, Card, ColumnWithCards } from './types'
+import {
+  positionForInsert,
+  type BoardDetail,
+  type Card,
+  type ColumnWithCards,
+} from '@kanban/shared'
 
 // id と now はアクションに含めて渡す。reducer の中で crypto.randomUUID() や new Date() を
 // 呼ぶと、同じ入力でも結果が変わる「純粋でない」関数になってしまう

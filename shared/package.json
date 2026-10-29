@@ -1,0 +1,22 @@
+{
+  "name": "@kanban/shared",
+  "private": true,
+  "version": "0.0.0",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc",
+    "lint": "oxlint"
+  },
+  "devDependencies": {
+    "typescript": "~7.0.2",
+    "vitest": "^5.0.5"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
+  }
+}

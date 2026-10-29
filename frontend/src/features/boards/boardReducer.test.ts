@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { boardReducer, findCard } from './boardReducer'
 import { mockBoard } from './mockBoard'
-import type { BoardDetail } from './types'
+import type { BoardDetail } from '@kanban/shared'
 
 const now = '2026-11-01T00:00:00.000Z'
 

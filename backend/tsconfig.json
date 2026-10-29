@@ -10,7 +10,8 @@
     "verbatimModuleSyntax": true,
     "noEmit": true,
     "noUnusedLocals": true,
-    "noUnusedParameters": true
+    "noUnusedParameters": true,
+    "allowImportingTsExtensions": true
   },
-  "include": ["src", "prisma.config.ts"]
+  "include": ["src", "test", "prisma.config.ts", "prisma/seed.ts", "vitest.config.ts"]
 }

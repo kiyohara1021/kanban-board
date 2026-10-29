@@ -21,7 +21,7 @@ import {
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { useCallback, useEffect, useRef, useState, type Dispatch } from 'react'
 import { boardReducer, findCard, findColumnOfCard, type BoardAction } from './boardReducer'
-import type { BoardDetail } from './types'
+import type { BoardDetail } from '@kanban/shared'
 
 // useSortable の data に入れる値。ドラッグしているのがカードかカラムかを見分けるのに使う
 export type DragData = { type: 'card' } | { type: 'column' }

@@ -11,8 +11,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { CARD_DESCRIPTION_MAX, CARD_TITLE_MAX } from '@/features/boards/limits'
-import type { Card } from '@/features/boards/types'
+import { CARD_DESCRIPTION_MAX, CARD_TITLE_MAX, type Card } from '@kanban/shared'
 
 type Props = {
   card: Card

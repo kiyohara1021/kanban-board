@@ -1,4 +1,4 @@
-import type { BoardDetail } from './types'
+import type { BoardDetail } from '@kanban/shared'
 
 // Step 1〜3 で使う固定データ。API と同じく、カラムとカードは position の昇順に並べておく
 const now = '2026-10-30T00:00:00.000Z'
