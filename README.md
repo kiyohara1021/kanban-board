@@ -41,13 +41,17 @@ npm run dev
 
 ```
 kanban-board/
-├── .github/       CI、Issue / PR テンプレート、Dependabot
+├── .github/       CI、Issue / PR テンプレート、Dependabot、Copilot 向けの説明
 ├── docs/          設計ドキュメント
 ├── frontend/      React アプリ（Vite の react-ts テンプレートから作成）
 ├── backend/       API サーバー（Prisma 公式の Express テンプレートから作成）
 ├── shared/        フロントとバックで共有する Zod スキーマ・型・並び順の計算（@kanban/shared）
+├── AGENTS.md      AI エージェント向けの説明（構成、コマンド、守ってほしいルール）
+├── CLAUDE.md      Claude Code 向け（AGENTS.md を読み込み、補足を足す）
 └── package.json   npm workspaces のルート
 ```
+
+AI エージェント（Claude Code、Codex、Cursor、GitHub Copilot など）に作業させるときの説明は、[AGENTS.md](AGENTS.md) にまとめている。
 
 ## テンプレートから作ったもの
 
