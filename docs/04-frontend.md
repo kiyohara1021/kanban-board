@@ -219,6 +219,30 @@ type NormalizedBoard = {
 - 操作は `userEvent` で、クリックやキー入力を実際の順番どおりに起こす。日本語入力の変換中の Enter（`isComposing`）だけは `userEvent` で再現できないので `fireEvent` を使う
 - `routes.test.tsx` では fetch を偽物に差し替え、ボード一覧からの作成、カードの URL を直接開く、存在しない URL、を確かめる
 
+## デモ版（GitHub Pages）
+
+https://kiyohara1021.github.io/kanban-board/ で公開している。GitHub Pages は静的なファイルしか配信できないので、バックエンドの代わりに MSW がブラウザの中で API を再現する。
+
+### 仕組み
+
+| ファイル                  | 役割                                                                                             |
+| ------------------------- | ------------------------------------------------------------------------------------------------ |
+| `src/demo/db.ts`          | バックエンドの3つのテーブルと同じ形のデータを `localStorage` に保存する。初回はサンプルを作る    |
+| `src/demo/api.ts`         | 14本のエンドポイントの処理。`backend/src/services/` と同じ規則で、検証と並び順は shared を使う   |
+| `src/demo/handlers.ts`    | MSW のハンドラー。URL と処理を結び付け、バックエンドと同じ形のレスポンスを返す（150ms 待たせる） |
+| `src/demo/browser.ts`     | Service Worker を登録して、`/api` へのリクエストを受け取り始める                                 |
+| `src/demo/DemoBanner.tsx` | 「デモ版」の表示と、データを初期状態に戻すボタン                                                 |
+
+- `npm run build:demo`（`vite build --mode demo`）で、`.env.demo` の `VITE_DEMO=true` が読み込まれる。`main.tsx` はそのときだけ、デモ用のコードを動的 import で読み込み、MSW の準備が終わってから画面を描く。通常のビルドには MSW が含まれない
+- Service Worker のファイル（`mockServiceWorker.js`）は、`vite.config.ts` の `msw/vite` プラグイン（`worker-only` モード）がデモ版のビルドのときだけ出力する。リポジトリには入れない
+- データは訪れた人のブラウザに保存されるので、ほかの人のデータを壊すことはない
+
+### GitHub Pages 特有の設定
+
+- **公開する場所**：`https://kiyohara1021.github.io/kanban-board/` のように `/kanban-board/` の下になる。Vite の `base` と React Router の `basename`（`import.meta.env.BASE_URL`）を合わせている
+- **URL を直接開いたとき**：Pages には「どの URL にも `index.html` を返す」設定がない。`/kanban-board/boards/xxx` を直接開くと 404 になるので、ビルドのあとに `index.html` を `404.html` としてコピーし、404 のページでもアプリが起動するようにしている
+- **公開の手順**：`.github/workflows/pages.yml` が、`main` へのプッシュのたびにデモ版をビルドして公開する
+
 ## スタイル
 
 - Tailwind CSS を使う

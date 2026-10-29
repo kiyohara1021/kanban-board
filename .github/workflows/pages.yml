@@ -1,0 +1,46 @@
+# デモ版（バックエンドの代わりに MSW がブラウザの中で動く）を GitHub Pages に公開する
+# https://kiyohara1021.github.io/kanban-board/
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  # Actions の画面から手動でも実行できる
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 公開が重なったときは、後から始まったものだけを残す
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # frontend/dist に、/kanban-board/ 用のファイルと 404.html、mockServiceWorker.js が出力される
+      - run: npm run build:demo
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: frontend/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

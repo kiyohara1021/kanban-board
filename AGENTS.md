@@ -33,6 +33,7 @@ npm test                        # 3パッケージのテスト
 npm run lint                    # oxlint
 npm run format                  # Prettier（format:check で確認だけ）
 npm run build                   # フロントのビルドと3パッケージの型チェック
+npm run build:demo              # GitHub Pages 用のデモ版（確認は npm run preview:demo -w frontend）
 ```
 
 作業を終える前に、`npm run format:check`、`npm run lint`、`npm test`、`npm run build` がすべて通ることを確かめる。CI（`.github/workflows/ci.yml`）も同じ4つを実行する。
@@ -67,14 +68,22 @@ npm run build                   # フロントのビルドと3パッケージの
 - ポートの環境変数は `API_PORT`（`PORT` は他のツールとぶつかるので使わない）
 - スキーマを変えたら `npm run db:migrate -w backend` でマイグレーションを作り、`docs/02-data-model.md` も直す
 
+### デモ版（GitHub Pages）
+
+- `main` へのプッシュで `.github/workflows/pages.yml` が `npm run build:demo` を実行し、https://kiyohara1021.github.io/kanban-board/ に公開する
+- デモ版では MSW（`frontend/src/demo/`）が `/api` をブラウザの中で受け、`localStorage` を DB として API を再現する。**API の動き（エンドポイント、検証、エラー、並び順）を変えたら、`backend/src/services/` と同じ変更を `frontend/src/demo/api.ts` にも入れ、`frontend/src/demo/api.test.ts` も直す**
+- デモ版は `/kanban-board/` の下で動くので、URL やファイルのパスは `import.meta.env.BASE_URL` を使い、`/` から始まる固定のパスを書かない（API の `/api` は MSW が受けるので例外）
+- 通常のビルドに MSW が入らないよう、デモ用のコードは `main.tsx` から動的 import でだけ読み込む
+
 ## テスト
 
-| 対象                                  | 場所                          | 方法                                                               |
-| ------------------------------------- | ----------------------------- | ------------------------------------------------------------------ |
-| 並び順の計算                          | `shared/src/position.test.ts` | Vitest                                                             |
-| reducer、API クライアント、sendAction | `frontend/src/**/*.test.ts`   | Vitest。fetch は `vi.stubGlobal` で偽物にする                      |
-| 画面                                  | `frontend/src/**/*.test.tsx`  | React Testing Library（jsdom）。要素は role と表示される文字で探す |
-| API                                   | `backend/test/api.test.ts`    | Supertest。テスト専用の `prisma/test.db` を毎回作り直す            |
+| 対象                                  | 場所                            | 方法                                                               |
+| ------------------------------------- | ------------------------------- | ------------------------------------------------------------------ |
+| 並び順の計算                          | `shared/src/position.test.ts`   | Vitest                                                             |
+| reducer、API クライアント、sendAction | `frontend/src/**/*.test.ts`     | Vitest。fetch は `vi.stubGlobal` で偽物にする                      |
+| 画面                                  | `frontend/src/**/*.test.tsx`    | React Testing Library（jsdom）。要素は role と表示される文字で探す |
+| API                                   | `backend/test/api.test.ts`      | Supertest。テスト専用の `prisma/test.db` を毎回作り直す            |
+| デモ版の API                          | `frontend/src/demo/api.test.ts` | Vitest。バックエンドの API テストと同じ規則で動くことを確かめる    |
 
 - 画面のテストでは、クラス名や DOM の構造ではなく `getByRole('button', { name: '追加' })` のように探す
 - 画面の変更は、テストに加えて `npm run dev` でブラウザでも確かめる。ドラッグ&ドロップはマウスとキーボード（Space・矢印キー）の両方で確認する
