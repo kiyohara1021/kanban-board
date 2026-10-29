@@ -9,7 +9,7 @@ updates:
       minor-and-patch:
         update-types: [minor, patch]
     ignore:
-      # Node.js 24（.nvmrc）に合わせるため、型定義のメジャーバージョンは上げない
+      # サポートする一番古い Node.js 24（package.json の engines）に合わせるため、型定義のメジャーバージョンは上げない
       - dependency-name: '@types/node'
         update-types: ['version-update:semver-major']
   - package-ecosystem: github-actions

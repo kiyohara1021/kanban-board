@@ -10,12 +10,19 @@ permissions:
 
 jobs:
   check:
+    name: check (Node.js ${{ matrix.node-version }})
     runs-on: ubuntu-latest
+    strategy:
+      # 片方が失敗しても、もう片方の結果も最後まで見る
+      fail-fast: false
+      matrix:
+        # サポートする一番古い LTS（package.json の engines）と、推奨の LTS（.nvmrc）
+        node-version: [24, 26]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version-file: .nvmrc
+          node-version: ${{ matrix.node-version }}
           cache: npm
       - run: npm ci
       - run: npm run format:check

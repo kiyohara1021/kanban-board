@@ -15,7 +15,7 @@ Trello のようなかんばんボードを作りながら React を学ぶプロ
 
 ## 起動方法
 
-Node.js 24 以上が必要。
+Node.js 24 以上が必要。推奨は最新の LTS である 26（`.nvmrc` に書いてある）。nvm や fnm を使っている場合は、`nvm use` などで切り替えられる。
 
 ```bash
 npm install
