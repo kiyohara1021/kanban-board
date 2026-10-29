@@ -94,6 +94,51 @@ Step 6 までで、[要件](docs/01-requirements.md)の MVP（ボード・カラ
 - ログインと複数ユーザー対応
 - リアルタイム同期（WebSocket）
 
+## 学習者向けの進め方
+
+各 Step が終わった時点に、タグを付けている。好きな Step の終わりから始めて、次の Step を自分で作り、完成形と見比べられる。
+
+| タグ     | その時点の状態                                                | 次に自分で作るもの               |
+| -------- | ------------------------------------------------------------- | -------------------------------- |
+| `step-2` | 固定データのボードで、カード・カラムを追加・編集・削除できる  | Step 3：ドラッグ&ドロップ        |
+| `step-3` | ドラッグ&ドロップで並び替えられる（データはまだ保存されない） | Step 4：バックエンド API         |
+| `step-4` | API と DB ができている（画面はまだ固定データ）                | Step 5：画面と API をつなぐ      |
+| `step-5` | 画面の操作がサーバーに保存される（ボードは1つ目だけを表示）   | Step 6：ボード一覧とルーティング |
+| `step-6` | MVP 完成                                                      | 「今後の候補」から選ぶ           |
+
+Step 1 は Step 2 と同じコミットに入っているため、タグは `step-2` から始まる。Step 1 から自分で作りたいときは、[設計ドキュメント](#設計ドキュメント)を読みながら新しいプロジェクトで作ってみる。
+
+### 例：Step 3 を自分で作る
+
+```bash
+git clone https://github.com/kiyohara1021/kanban-board.git
+cd kanban-board
+
+# step-2 の状態から、自分用のブランチを作る
+git switch -c my-step3 step-2
+npm install
+npm run dev
+```
+
+詰まったら、完成形と見比べる。
+
+```bash
+# Step 2 から Step 3 で変わったファイルの一覧
+git diff --stat step-2 step-3
+
+# 特定のファイルの変更
+git diff step-2 step-3 -- frontend/src/pages/BoardPage.tsx
+
+# 完成形のファイルを、今のブランチを変えずに見る
+git show step-3:frontend/src/features/boards/useBoardDnd.ts
+```
+
+### 注意
+
+- タグによって使っているライブラリが違うので、切り替えたら `npm install` をやり直す
+- `step-4` 以降は DB を使う。最初に `npm run db:migrate -w backend` と `npm run db:seed -w backend` を実行する
+- 各 Step のコミットメッセージと[設計ドキュメント](#設計ドキュメント)に、その Step で決めたことやつまずいた点を書いてある
+
 ## ライセンス
 
 [MIT](LICENSE)
