@@ -1,6 +1,6 @@
 # かんばんボード
 
-React 19 と TypeScript で作った、Trello のようなかんばんボード。React を学ぶ教材として、設計から完成までを6つの Step に分けて作っている。
+React 19 と TypeScript で作った、Trello のようなかんばんボードです。React を学ぶための教材として、設計から完成までを6つのステップに分けて作っています。
 
 [![CI](https://github.com/kiyohara1021/kanban-board/actions/workflows/ci.yml/badge.svg)](https://github.com/kiyohara1021/kanban-board/actions/workflows/ci.yml)
 [![Pages](https://github.com/kiyohara1021/kanban-board/actions/workflows/pages.yml/badge.svg)](https://github.com/kiyohara1021/kanban-board/actions/workflows/pages.yml)
@@ -9,17 +9,17 @@ React 19 と TypeScript で作った、Trello のようなかんばんボード�
 
 **デモ：https://kiyohara1021.github.io/kanban-board/**
 
-インストール不要でそのまま触れる。デモ版では API をブラウザの中で再現しているので、データはそのブラウザにだけ保存され、ほかの人には見えない。
+インストールせずに、ブラウザですぐに試せます。デモ版ではサーバーの代わりにブラウザの中で API を動かしているため、操作した内容はお使いのブラウザの中だけに保存され、ほかの人と共有されることはありません。
 
 ![ボード画面。ToDo・進行中・完了の3つのカラムにカードが並んでいる](docs/images/board.png)
 
 ## 特徴
 
-- カード・カラムの追加・編集・削除と、ドラッグ&ドロップでの並び替え（マウス・タッチ・キーボード）
-- ボード一覧と、URL で開けるカード詳細（共有でき、再読み込みしても開いたまま）
-- 操作は画面にすぐ反映し、裏でサーバーに保存する（楽観的更新）。失敗したら元に戻して通知する
-- キーボード操作、スクリーンリーダーの読み上げ、日本語入力（変換中の Enter）に配慮
-- フロントエンド・バックエンド・共有パッケージのテストを、Node.js 24 と 26 の CI で毎回実行
+- カードとカラムの追加・編集・削除、ドラッグ&ドロップでの並び替え（マウス・タッチ・キーボードに対応）
+- ボードの一覧と、URL で直接開けるカード詳細（URL を共有でき、再読み込みしても開いたままになります）
+- 操作はすぐ画面に反映され、サーバーへの保存は裏側で行います（楽観的更新）。保存に失敗したときは元の状態に戻し、エラーをお知らせします
+- キーボード操作、スクリーンリーダーでの読み上げ、日本語入力（変換を確定する Enter）に配慮しています
+- フロントエンド・バックエンド・共有パッケージのテストを、Node.js 24 と 26 の CI で毎回実行しています
 
 <details>
 <summary>カード詳細の画面</summary>
@@ -30,47 +30,59 @@ React 19 と TypeScript で作った、Trello のようなかんばんボード�
 
 ## 技術スタック
 
-| 分類              | 採用技術                                         | 選んだ理由                                                                       |
-| ----------------- | ------------------------------------------------ | -------------------------------------------------------------------------------- |
-| フロントエンド    | React 19 / TypeScript / Vite                     | 現在の標準的な構成で、資料が多い                                                 |
-| UI                | Tailwind CSS v4 / shadcn/ui（Radix）             | 部品のコードが自分のリポジトリに入るので、読んで学べ、自由に直せる               |
-| サーバーの状態    | TanStack Query                                   | 取得・キャッシュ・再取得・楽観的更新を任せられる                                 |
-| ルーティング      | React Router v8                                  | 子ルートで、カード詳細を URL で表せる。ページごとにファイルを分けて読み込める    |
-| エラー処理        | react-error-boundary                             | 描画中のエラーを受け止める部品を、クラスコンポーネントを書かずに使える           |
-| ドラッグ&ドロップ | dnd-kit（`@dnd-kit/core` / `sortable`）          | 安定版で、キーボード操作と読み上げに対応している                                 |
-| バックエンド      | Express 5 / Prisma 7 / SQLite（libsql）          | async の中のエラーを自動でまとめて扱え、DB の操作に型が付き、DB の準備がいらない |
-| 共通              | Zod（`@kanban/shared`）                          | 入力の検証ルールと型を、フロントとバックで1か所にまとめられる                    |
-| テスト            | Vitest / React Testing Library / Supertest / MSW | 単体・画面・API をそれぞれ、利用者に近い形で試せる                               |
-| 品質管理          | oxlint / Prettier / GitHub Actions / Dependabot  | 速い lint と自動整形、2つの Node.js での CI、依存パッケージの更新を自動化        |
+| 分類              | 採用技術                                         | 選んだ理由                                                                                |
+| ----------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| フロントエンド    | React 19 / TypeScript / Vite                     | 現在の標準的な構成で、参考になる資料が多いため                                            |
+| UI                | Tailwind CSS v4 / shadcn/ui（Radix）             | 部品のコードがリポジトリの中に置かれるので、読んで学べるうえ、自由に手を加えられるため    |
+| サーバーの状態    | TanStack Query                                   | データの取得・キャッシュ・再取得・楽観的更新を任せられるため                              |
+| ルーティング      | React Router v8                                  | 子ルートを使ってカード詳細を URL で表せるうえ、ページごとにファイルを分けて読み込めるため |
+| エラー処理        | react-error-boundary                             | 描画中のエラーを受け止める部品を、クラスコンポーネントを書かずに使えるため                |
+| ドラッグ&ドロップ | dnd-kit（`@dnd-kit/core` / `sortable`）          | 安定版で、キーボード操作と読み上げに対応しているため                                      |
+| バックエンド      | Express 5 / Prisma 7 / SQLite（libsql）          | 下の補足を参照                                                                            |
+| 共通              | Zod（`@kanban/shared`）                          | 入力チェックのルールと型を、フロントエンドとバックエンドで1か所にまとめられるため         |
+| テスト            | Vitest / React Testing Library / Supertest / MSW | 関数・画面・API を、それぞれ実際の使われ方に近い形でテストできるため                      |
+| 品質管理          | oxlint / Prettier / GitHub Actions / Dependabot  | 下の補足を参照                                                                            |
+
+**バックエンドの補足**
+
+- Express 5：非同期の処理の中で起きたエラーを、自動でエラー処理に渡してくれます
+- Prisma 7：データベースの操作に型が付き、書き間違いに気づきやすくなります
+- SQLite：ファイル1つで動くので、データベースのサーバーを用意する必要がありません
+
+**品質管理の補足**
+
+- oxlint と Prettier：高速なコードチェックと、自動の整形を行います
+- GitHub Actions：Node.js 24 と 26 の両方でテストとビルドを実行し、デモ版を GitHub Pages に公開します
+- Dependabot：依存パッケージの更新を自動で提案します
 
 ## 設計で工夫したところ
 
-### 1つの reducer を、3つの場面で使い回す
+### 1つの reducer を3つの場面で使い回す
 
-ボードへの変更（カードの追加・移動など）は、すべて `boardReducer` のアクションとして表している。アクションの形を API と揃えたことで、同じ reducer を次の3か所で使える。
+カードの追加や移動など、ボードへの変更はすべて `boardReducer` のアクションとして表しています。アクションの形を API に合わせておいたことで、同じ reducer を次の3つの場面で使えるようになりました。
 
 1. **Step 2〜3**：画面の状態を `useReducer` で管理する
-2. **Step 5**：API の結果を待たずにキャッシュを書き換える（楽観的更新）。失敗したら元に戻す
-3. **ドラッグ中**：カラムをまたいだ移動を、ドロップ前から画面に映す
+2. **Step 5**：API の結果を待たずにキャッシュを書き換える（楽観的更新）。失敗したときは元に戻す
+3. **ドラッグ中**：別のカラムへの移動を、ドロップする前から画面に表示する
 
-画面からは `run(action)` を呼ぶだけで、画面の更新と API の呼び出しが行われる（[useBoardAction.ts](frontend/src/features/boards/useBoardAction.ts)）。
+コンポーネントからは `run(action)` を呼ぶだけで、表示の更新と API の呼び出しがまとめて行われます（[useBoardAction.ts](frontend/src/features/boards/useBoardAction.ts)）。
 
-### ルールをフロントとバックで共有する
+### ルールをフロントエンドとバックエンドで共有する
 
-文字数制限などの入力ルールは Zod のスキーマとして `shared/` に1つだけ書き、バックエンドはリクエストの検証に、フロントエンドは型とフォームの制限に使う。並び順の計算（[position.ts](shared/src/position.ts)）も共有し、画面の仮の並びと保存される値が必ず一致するようにしている。
+文字数の上限などの入力ルールは、Zod のスキーマとして `shared/` に1か所だけ書いています。バックエンドはリクエストのチェックに、フロントエンドは型とフォームの入力制限に、同じスキーマを使います。並び順の計算（[position.ts](shared/src/position.ts)）も共有しているので、ドラッグ中の画面の並びと、保存される並びが必ず一致します。
 
-### 並び順は小数で持つ
+### 並び順を小数で持つ
 
-並び順を 1000, 2000, 3000… の小数で持ち、間に入れるときは中間の値（1500）にする。移動のたびに書き換えるのは1件だけで済み、隙間が狭くなりすぎたときだけ振り直す。
+カードの並び順は 1000、2000、3000… のような数値で持ち、間に差し込むときは前後の中間の値（1500 など）を使います。こうすると、移動のたびに書き換えるのは動かしたカード1枚分だけで済みます。間隔が狭くなりすぎたときだけ、まとめて番号を振り直します。
 
-### キーボードと日本語入力でも使える
+### キーボードと日本語入力に対応する
 
-- ドラッグ&ドロップは Space で持ち上げ、矢印キーで動かし、Space で置ける。隣のカラムへの移動、ドロップ後のフォーカスの戻り先、日本語の読み上げまで対応した
-- 名前の変更などで Enter を扱うときは、日本語入力の変換を確定する Enter を除外している
+- ドラッグ&ドロップは、Space キーで持ち上げ、矢印キーで動かし、もう一度 Space キーで置けます。隣のカラムへの移動、置いたあとのフォーカスの位置、日本語での読み上げにも対応しています
+- 名前の変更などで Enter キーを扱うときは、日本語入力で変換を確定するための Enter に反応しないようにしています
 
-### デモ版はブラウザの中で API を再現する
+### デモ版ではブラウザの中で API を動かす
 
-GitHub Pages ではサーバーを動かせないので、デモ版では [MSW](https://mswjs.io/) の Service Worker が `/api` へのリクエストを受け取り、`localStorage` を DB として同じ API を再現する（[frontend/src/demo/](frontend/src/demo/)）。アプリのコードはデモ版と通常版で共通で、通常のビルドには MSW を含めない。
+GitHub Pages ではサーバーを動かせません。そこでデモ版では、[MSW](https://mswjs.io/) の Service Worker が `/api` へのリクエストを受け取り、`localStorage` をデータベースの代わりにして、本物と同じ API を再現しています（[frontend/src/demo/](frontend/src/demo/)）。アプリ本体のコードはデモ版と通常版で共通で、通常版のビルドには MSW を含めていません。
 
 ## 構成
 
@@ -94,40 +106,40 @@ flowchart LR
 kanban-board/
 ├── frontend/      React アプリ（Vite の react-ts テンプレートから作成）
 ├── backend/       API サーバー（Prisma 公式の Express テンプレートから作成）
-├── shared/        フロントとバックで共有する Zod スキーマ・型・並び順の計算
+├── shared/        フロントエンドとバックエンドで共有する Zod スキーマ・型・並び順の計算
 ├── docs/          設計ドキュメントと画像
 ├── .github/       CI、GitHub Pages への公開、Issue / PR テンプレート、Dependabot
-├── AGENTS.md      AI エージェント向けの説明（CLAUDE.md、.github/copilot-instructions.md からも参照）
+├── AGENTS.md      AI エージェント向けの説明（CLAUDE.md と .github/copilot-instructions.md からも参照）
 └── package.json   npm workspaces のルート
 ```
 
 ## ローカルで動かす
 
-Node.js 24 以上が必要。推奨は最新の LTS である 26（`.nvmrc` に書いてある）。nvm や fnm を使っている場合は、`nvm use` などで切り替えられる。
+Node.js 24 以上が必要です。推奨は最新の LTS である 26 です（`.nvmrc` に書いてあります）。nvm や fnm をお使いの場合は、`nvm use` などで切り替えられます。
 
 ```bash
 npm install
-npm run db:migrate -w backend   # 初回だけ。SQLite の DB（backend/prisma/dev.db）を作る
-npm run db:seed -w backend      # サンプルのボードを入れる（実行するたびにサンプルの状態に戻る）
-npm run dev                     # フロントとバックを同時に起動する
+npm run db:migrate -w backend   # 初回だけ。SQLite のデータベース（backend/prisma/dev.db）を作ります
+npm run db:seed -w backend      # サンプルのボードを入れます（実行するたびにサンプルの状態に戻ります）
+npm run dev                     # フロントエンドとバックエンドを同時に起動します
 ```
 
-http://localhost:5173 を開く。
+起動したら、http://localhost:5173 を開いてください。
 
-| コマンド                       | 内容                                                                  |
-| ------------------------------ | --------------------------------------------------------------------- |
-| `npm test`                     | 3つのパッケージのテスト（Vitest。backend は Supertest で API を試す） |
-| `npm run build`                | フロントのビルドと、3つのパッケージの型チェック                       |
-| `npm run build:demo`           | GitHub Pages 用のデモ版をビルドする（`frontend/dist`）                |
-| `npm run lint`                 | lint（oxlint）                                                        |
-| `npm run format`               | 整形（Prettier）。`format:check` は確認だけ                           |
-| `npm run db:studio -w backend` | ブラウザで DB の中身を見る（Prisma Studio）                           |
+| コマンド                       | 内容                                                                        |
+| ------------------------------ | --------------------------------------------------------------------------- |
+| `npm test`                     | 3つのパッケージのテスト（Vitest。バックエンドは Supertest で API をテスト） |
+| `npm run build`                | フロントエンドのビルドと、3つのパッケージの型チェック                       |
+| `npm run build:demo`           | GitHub Pages 用のデモ版のビルド（`frontend/dist` に出力）                   |
+| `npm run lint`                 | コードのチェック（oxlint）                                                  |
+| `npm run format`               | コードの整形（Prettier）。整形が必要かどうかの確認だけなら `format:check`   |
+| `npm run db:studio -w backend` | データベースの中身をブラウザで見る（Prisma Studio）                         |
 
-デモ版を手元で確かめるときは、`npm run build:demo` のあとに `npm run preview:demo -w frontend` を実行し、http://localhost:4173/kanban-board/ を開く。
+デモ版を手元で確認するときは、`npm run build:demo` のあとに `npm run preview:demo -w frontend` を実行し、http://localhost:4173/kanban-board/ を開いてください。
 
 ## 学習者向けの進め方
 
-React の学習に集中するため、最初はフロントエンドだけで作り、後から API とつなぐ順番にしている。各 Step が終わった時点にタグを付けているので、好きな Step の終わりから始めて、次の Step を自分で作り、完成形と見比べられる。
+React の学習に集中できるよう、最初はフロントエンドだけで作り、あとから API とつなぐ順番にしています。各ステップが終わった時点にタグを付けているので、好きなステップから始めて次のステップを自分で作り、完成形と見比べることができます。
 
 | Step | 内容                              | 主に学ぶこと                                                                      | 完成形のタグ        |
 | ---- | --------------------------------- | --------------------------------------------------------------------------------- | ------------------- |
@@ -135,10 +147,10 @@ React の学習に集中するため、最初はフロントエンドだけで�
 | 2    | カード・カラムの追加・編集・削除  | `useState` / `useReducer`、イミュータブルな更新、フォーム                         | `step-2`            |
 | 3    | ドラッグ&ドロップで並び替え・移動 | dnd-kit、イベント処理、ネストした状態の更新                                       | `step-3`            |
 | 4    | バックエンド API を作る           | Express、Prisma、Zod によるバリデーション                                         | `step-4`            |
-| 5    | フロントと API をつなぐ           | TanStack Query、ローディング・エラー表示、楽観的更新                              | `step-5`            |
+| 5    | フロントエンドと API をつなぐ     | TanStack Query、ローディング・エラー表示、楽観的更新                              | `step-5`            |
 | 6    | ボード一覧とルーティング          | React Router（子ルート）、URL で状態を表す、画面のテスト（React Testing Library） | `step-6`            |
 
-Step 1 は Step 2 と同じコミットに入っているため、タグは `step-2` から始まる。Step 1 から自分で作りたいときは、[設計ドキュメント](#ドキュメント)を読みながら新しいプロジェクトで作ってみる。
+Step 1 は Step 2 と同じコミットに含まれているため、タグは `step-2` から始まります。Step 1 から作ってみたい場合は、[設計ドキュメント](#ドキュメント)を読みながら、新しいプロジェクトで作ってみてください。
 
 ### 例：Step 3 を自分で作る
 
@@ -152,66 +164,66 @@ npm install
 npm run dev
 ```
 
-詰まったら、完成形と見比べる。
+行き詰まったときは、完成形と見比べてみてください。
 
 ```bash
 # Step 2 から Step 3 で変わったファイルの一覧
 git diff --stat step-2 step-3
 
-# 特定のファイルの変更
+# 特定のファイルの変更内容
 git diff step-2 step-3 -- frontend/src/pages/BoardPage.tsx
 
-# 完成形のファイルを、今のブランチを変えずに見る
+# 今のブランチのまま、完成形のファイルを表示する
 git show step-3:frontend/src/features/boards/useBoardDnd.ts
 ```
 
-- タグによって使っているライブラリが違うので、切り替えたら `npm install` をやり直す
-- `step-4` 以降は DB を使う。最初に `npm run db:migrate -w backend` と `npm run db:seed -w backend` を実行する
-- 各 Step のコミットメッセージと設計ドキュメントに、その Step で決めたことやつまずいた点を書いてある
+- タグによって使っているライブラリが異なるため、タグを切り替えたら `npm install` を実行し直してください
+- `step-4` 以降はデータベースを使います。最初に `npm run db:migrate -w backend` と `npm run db:seed -w backend` を実行してください
+- 各ステップで決めたことや、つまずいたところは、コミットメッセージと設計ドキュメントに書いてあります
 
 ## ドキュメント
 
 1. [要件・画面](docs/01-requirements.md)
 2. [データモデル](docs/02-data-model.md)
 3. [API 設計](docs/03-api.md)
-4. [フロントエンド設計](docs/04-frontend.md)（各 Step で決めたこと、つまずいた点、デモ版の仕組み）
+4. [フロントエンド設計](docs/04-frontend.md)（各ステップで決めたこと、つまずいたところ、デモ版の仕組み）
 5. [バックエンド設計](docs/05-backend.md)
 
-AI エージェント（Claude Code、Codex、Cursor、GitHub Copilot など）に作業させるときの説明は、[AGENTS.md](AGENTS.md) にまとめている。
+AI エージェント（Claude Code、Codex、Cursor、GitHub Copilot など）に作業を任せるときの説明は、[AGENTS.md](AGENTS.md) にまとめています。
 
 ### テンプレートから作ったもの
 
-自分で書く必要のない部分は、公式のテンプレートや生成ツールを使っている。
+自分で書く必要のない部分は、公式のテンプレートや生成ツールを使って作っています。
 
-| 対象                          | 使ったもの                                                                                                                      | 自分で変えたところ                                  |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| `frontend/`                   | `npm create vite`（react-ts）                                                                                                   | サンプル画面の削除、Tailwind・パスエイリアス        |
-| `frontend/src/components/ui/` | `npx shadcn add`（button, dialog, alert-dialog, input, textarea, label, sonner）                                                | 閉じるボタンの読み上げを日本語に変更                |
-| `backend/`                    | `npx try-prisma --template orm/express`（[prisma-examples](https://github.com/prisma/prisma-examples/tree/latest/orm/express)） | PostgreSQL から SQLite に変更、構成を設計に合わせた |
+| 対象                          | 使ったもの                                                                                                                      | 変更した点                                                               |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `frontend/`                   | `npm create vite`（react-ts）                                                                                                   | サンプル画面の削除、Tailwind CSS とパスエイリアスの追加                  |
+| `frontend/src/components/ui/` | `npx shadcn add`（button, dialog, alert-dialog, input, textarea, label, sonner）                                                | ダイアログの閉じるボタンの読み上げを日本語に変更                         |
+| `backend/`                    | `npx try-prisma --template orm/express`（[prisma-examples](https://github.com/prisma/prisma-examples/tree/latest/orm/express)） | データベースを PostgreSQL から SQLite に変更し、構成を設計に合わせて整理 |
 
 ## ロードマップ
 
-[要件](docs/01-requirements.md)の「MVP の後に追加する候補」から選んで進める。
+[要件](docs/01-requirements.md)の「MVP の後に追加する候補」から選んで進める予定です。
 
-- [ ] ラベル（色付きタグ）
+- [ ] ラベル（色付きのタグ）
 - [ ] 期限日と、期限切れの強調表示
 - [ ] カードの検索・絞り込み
-- [ ] ログインと複数ユーザー対応
-- [ ] リアルタイム同期（WebSocket）
+- [ ] ログインと複数ユーザーへの対応
+- [ ] リアルタイムでの同期（WebSocket）
 
 ## 既知の問題・制限
 
-- ログインの仕組みがないため、バックエンドは手元で動かす前提にしている。公開するデモはブラウザの中だけで動く
-- カードやカラムを追加した直後、保存が終わるまでの短い間は画面で作った仮の ID を持つ。この間にそのカードを編集すると、保存に失敗する
-- 同時に編集したときは、最後に保存したものが残る
-- デモ版のデータはブラウザごとに保存されるため、別の端末や別のブラウザとは共有されない
+- ログイン機能がないため、バックエンドはローカルで動かすことを前提にしています。公開しているデモは、ブラウザの中だけで動いています
+- カードやカラムを追加した直後は、サーバーへの保存が終わるまでの短い間、画面側で作った一時的な ID が使われます。この間にそのカードを編集すると、保存に失敗します
+- 複数の人が同時に編集した場合は、最後に保存された内容が残ります
+- デモ版のデータはブラウザごとに保存されるため、別の端末や別のブラウザとは共有されません
 
 ## ライセンス
 
 [MIT](LICENSE)
 
-## 参考
+## 参考にしたもの
 
-- [kawamou/kanban-board](https://github.com/kawamou/kanban-board)：コンポーネントの分け方、カスタムフックへの切り出し方
+- [kawamou/kanban-board](https://github.com/kawamou/kanban-board)：コンポーネントの分け方と、カスタムフックへの切り出し方
 - [braiekhazem/react-kanban-kit](https://github.com/braiekhazem/react-kanban-kit)：ID をキーにした平らなデータ構造（[フロントエンド設計](docs/04-frontend.md#別案正規化した状態)を参照）
-- [alan2207/bulletproof-react](https://github.com/alan2207/bulletproof-react)、[shadcn-ui/taxonomy](https://github.com/shadcn-ui/taxonomy)、[gothinkster/realworld](https://github.com/gothinkster/realworld)：README の構成、公開デモの見せ方
+- [alan2207/bulletproof-react](https://github.com/alan2207/bulletproof-react)、[shadcn-ui/taxonomy](https://github.com/shadcn-ui/taxonomy)、[gothinkster/realworld](https://github.com/gothinkster/realworld)：README の構成と、公開デモの見せ方
