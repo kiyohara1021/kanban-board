@@ -3,6 +3,7 @@ import { horizontalListSortingStrategy, SortableContext } from '@dnd-kit/sortabl
 import { COLUMN_TITLE_MAX, type BoardDetail } from '@kanban/shared'
 import { Link, Outlet, useNavigate, useParams } from 'react-router'
 import { AddItemForm } from '@/components/AddItemForm'
+import { SectionErrorBoundary } from '@/components/SectionErrorBoundary'
 import { StatusMessage } from '@/components/StatusMessage'
 import { newId, now } from '@/features/boards/actionValues'
 import type { BoardAction } from '@/features/boards/boardReducer'
@@ -46,54 +47,66 @@ function BoardView({ board }: { board: BoardDetail }) {
   // Step 2〜3 の dispatch と同じ形で呼べる。中で画面の更新と API の呼び出しをする
   const run = useBoardAction(board.id)
   const updateBoard = useUpdateBoard(board.id)
+
+  return (
+    <div className="flex h-dvh flex-col bg-slate-100">
+      <BoardHeader title={board.title} onRename={(title) => updateBoard.mutate({ title })} />
+      {/* カラムとカードの表示で描画中のエラーが起きても、ヘッダー（一覧に戻るリンク）は残す。
+          エラーバウンダリーは、自分より内側で起きたエラーだけを受け止める */}
+      <SectionErrorBoundary resetKeys={[board]}>
+        <BoardColumns board={board} run={run} />
+      </SectionErrorBoundary>
+
+      {/* 子ルート（/boards/:boardId/cards/:cardId のカード詳細）がここに表示される */}
+      <Outlet context={{ board, run } satisfies BoardOutletContext} />
+    </div>
+  )
+}
+
+// カラムとカードの並び。ドラッグ&ドロップもここで扱う
+function BoardColumns({ board, run }: { board: BoardDetail; run: (action: BoardAction) => void }) {
   // ドラッグ中は、カラムをまたいだ移動を反映した仮のボード（shownBoard）を表示する
   const { shownBoard, activeCard, activeColumn, contextProps } = useBoardDnd(board, run)
   const navigate = useNavigate()
 
   return (
-    <div className="flex h-dvh flex-col bg-slate-100">
-      <BoardHeader title={board.title} onRename={(title) => updateBoard.mutate({ title })} />
-      <DndContext {...contextProps}>
-        <main className="flex min-h-0 flex-1 snap-x scroll-px-4 items-start gap-3 overflow-x-auto p-4">
-          <SortableContext
-            items={shownBoard.columns.map((column) => column.id)}
-            strategy={horizontalListSortingStrategy}
-          >
-            {shownBoard.columns.map((column) => (
-              <BoardColumn
-                key={column.id}
-                column={column}
-                onRename={(title) =>
-                  run({ type: 'renameColumn', columnId: column.id, title, now: now() })
-                }
-                onDelete={() => run({ type: 'deleteColumn', columnId: column.id })}
-                onAddCard={(title) =>
-                  run({ type: 'addCard', id: newId(), columnId: column.id, title, now: now() })
-                }
-                // 開いているカードは URL で表す。リロードしても開いたままになり、URL を共有できる
-                onOpenCard={(cardId) => navigate(`/boards/${board.id}/cards/${cardId}`)}
-              />
-            ))}
-          </SortableContext>
-          <div className="w-72 shrink-0 snap-start rounded-xl bg-slate-200/40 p-2">
-            <AddItemForm
-              label="カラムを追加"
-              placeholder="カラム名"
-              maxLength={COLUMN_TITLE_MAX}
-              onAdd={(title) => run({ type: 'addColumn', id: newId(), title, now: now() })}
+    <DndContext {...contextProps}>
+      <main className="flex min-h-0 flex-1 snap-x scroll-px-4 items-start gap-3 overflow-x-auto p-4">
+        <SortableContext
+          items={shownBoard.columns.map((column) => column.id)}
+          strategy={horizontalListSortingStrategy}
+        >
+          {shownBoard.columns.map((column) => (
+            <BoardColumn
+              key={column.id}
+              column={column}
+              onRename={(title) =>
+                run({ type: 'renameColumn', columnId: column.id, title, now: now() })
+              }
+              onDelete={() => run({ type: 'deleteColumn', columnId: column.id })}
+              onAddCard={(title) =>
+                run({ type: 'addCard', id: newId(), columnId: column.id, title, now: now() })
+              }
+              // 開いているカードは URL で表す。リロードしても開いたままになり、URL を共有できる
+              onOpenCard={(cardId) => navigate(`/boards/${board.id}/cards/${cardId}`)}
             />
-          </div>
-        </main>
+          ))}
+        </SortableContext>
+        <div className="w-72 shrink-0 snap-start rounded-xl bg-slate-200/40 p-2">
+          <AddItemForm
+            label="カラムを追加"
+            placeholder="カラム名"
+            maxLength={COLUMN_TITLE_MAX}
+            onAdd={(title) => run({ type: 'addColumn', id: newId(), title, now: now() })}
+          />
+        </div>
+      </main>
 
-        {/* ドラッグ中、マウスや指に付いていく表示。元の要素とは別に、画面の一番上に描画される */}
-        <DragOverlay>
-          {activeCard && <CardPreview card={activeCard} className="rotate-2" />}
-          {activeColumn && <ColumnPreview column={activeColumn} />}
-        </DragOverlay>
-      </DndContext>
-
-      {/* 子ルート（/boards/:boardId/cards/:cardId のカード詳細）がここに表示される */}
-      <Outlet context={{ board, run } satisfies BoardOutletContext} />
-    </div>
+      {/* ドラッグ中、マウスや指に付いていく表示。元の要素とは別に、画面の一番上に描画される */}
+      <DragOverlay>
+        {activeCard && <CardPreview card={activeCard} className="rotate-2" />}
+        {activeColumn && <ColumnPreview column={activeColumn} />}
+      </DragOverlay>
+    </DndContext>
   )
 }

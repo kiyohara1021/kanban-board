@@ -14,11 +14,11 @@ React を学ぶためのかんばんボード。学習者がコードを読ん�
 
 npm workspaces のモノレポ。Node.js 24 以上で動き、推奨は 26（`.nvmrc`）。CI は 24 と 26 の両方で動かしている。
 
-| パッケージ                    | 内容                                                                                                            |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `frontend/`                   | Vite + React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui（Radix）+ TanStack Query + React Router v8 + dnd-kit |
-| `backend/`                    | Express 5 + Prisma 7 + SQLite（`@prisma/adapter-libsql`）                                                       |
-| `shared/`（`@kanban/shared`） | Zod スキーマ、型、文字数制限、並び順の計算。ビルドせず TypeScript のソースをそのまま公開する                    |
+| パッケージ                    | 内容                                                                                                                                   |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `frontend/`                   | Vite + React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui（Radix）+ TanStack Query + React Router v8 + dnd-kit + react-error-boundary |
+| `backend/`                    | Express 5 + Prisma 7 + SQLite（`@prisma/adapter-libsql`）                                                                              |
+| `shared/`（`@kanban/shared`） | Zod スキーマ、型、文字数制限、並び順の計算。ビルドせず TypeScript のソースをそのまま公開する                                           |
 
 ## コマンド
 
@@ -49,6 +49,10 @@ npm run build:demo              # GitHub Pages 用のデモ版（確認は npm r
 
 ### フロントエンド
 
+- `main.tsx` は起動（デモ版の準備と `<App />` の描画）だけにする。アプリ全体の Provider は `app/provider.tsx`、ルーターは `app/router.tsx`、ルート定義は `app/routes/index.tsx` に書く
+- ページ（`pages/`）はルートの `lazy` で読み込む。ページを足すときも `lazy` で書き、ルート定義から `import ... from` でページを読み込まない（ビルドでページごとにファイルが分かれなくなる）
+- 描画中のエラーは、内側から順に `SectionErrorBoundary`（ページの一部）、ルートの `ErrorBoundary`（`app/routes/RouteErrorBoundary.tsx`）、`app/provider.tsx` の `ErrorBoundary`（アプリ全体）で受け止める。エラー画面は `components/ErrorFallback.tsx` を使う。取得の失敗はこれまでどおり `isError` を見てページの中で出す
+- エラー画面を変えたら、描画中に throw する一時的なコードでエラー画面と「再試行」「再読み込み」を確かめ、確かめたら消す
 - ボードを変更する操作は、すべて `features/boards/boardReducer.ts` のアクションとして表す。画面からは `useBoardAction` が返す `run(action)` を呼ぶ。これがキャッシュを reducer で先に書き換え（楽観的更新）、`sendAction` で API に送り、失敗したら元に戻す
 - reducer は純粋な関数に保つ。新しい ID と日時は `features/boards/actionValues.ts` の `newId()` / `now()` でイベントハンドラー側で作り、アクションに入れる
 - アクションの形は API（`docs/03-api.md`）と揃える。アクションを追加・変更したら、`sendAction` とそのテストも直す

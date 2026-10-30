@@ -35,7 +35,8 @@ React 19 と TypeScript で作った、Trello のようなかんばんボード�
 | フロントエンド    | React 19 / TypeScript / Vite                     | 現在の標準的な構成で、資料が多い                                                 |
 | UI                | Tailwind CSS v4 / shadcn/ui（Radix）             | 部品のコードが自分のリポジトリに入るので、読んで学べ、自由に直せる               |
 | サーバーの状態    | TanStack Query                                   | 取得・キャッシュ・再取得・楽観的更新を任せられる                                 |
-| ルーティング      | React Router v8                                  | 子ルートで、カード詳細を URL で表せる                                            |
+| ルーティング      | React Router v8                                  | 子ルートで、カード詳細を URL で表せる。ページごとにファイルを分けて読み込める    |
+| エラー処理        | react-error-boundary                             | 描画中のエラーを受け止める部品を、クラスコンポーネントを書かずに使える           |
 | ドラッグ&ドロップ | dnd-kit（`@dnd-kit/core` / `sortable`）          | 安定版で、キーボード操作と読み上げに対応している                                 |
 | バックエンド      | Express 5 / Prisma 7 / SQLite（libsql）          | async の中のエラーを自動でまとめて扱え、DB の操作に型が付き、DB の準備がいらない |
 | 共通              | Zod（`@kanban/shared`）                          | 入力の検証ルールと型を、フロントとバックで1か所にまとめられる                    |

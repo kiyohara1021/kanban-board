@@ -13,6 +13,7 @@ React を学ぶためのかんばんボード。詳しい説明とルールは�
 - 並び順は `shared/src/position.ts` の `positionForInsert` で計算する
 - フロントでボードを変える操作は、`boardReducer` のアクションとして表し、`useBoardAction` の `run(action)` で送る（楽観的更新）。reducer は純粋に保ち、ID と日時は `newId()` / `now()` で作ってアクションに入れる
 - import は `@/`（`frontend/src`）と `@kanban/shared` を使う
+- Provider とルートは `frontend/src/app/` に書く。ページ（`pages/`）はルートの `lazy` で読み込む。描画中のエラーはエラーバウンダリー（`components/ErrorFallback.tsx` で表示）で受け止める
 - `frontend/src/components/ui/` は shadcn/ui の生成ファイルなので編集しない
 - `<button>` には `type` を明示する。テキスト入力の Enter では `event.nativeEvent.isComposing` を確認する（日本語入力）
 - バックエンドの `routes/` は検証とステータスコードだけ、DB の操作は `services/`。エラーは `HttpError` 系を throw し、`try/catch` で包まない（Express 5 がエラーハンドラーに渡す）

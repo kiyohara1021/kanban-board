@@ -2,13 +2,22 @@
 
 ## ディレクトリ構成
 
-機能（feature）ごとにフォルダを分ける。ボード・カラム・カードに関係するファイルを、それぞれ近くにまとめるため。
+機能（feature）ごとにフォルダを分ける。ボード・カラム・カードに関係するファイルを、それぞれ近くにまとめるため。アプリ全体の組み立て（Provider とルート）は `app/` にまとめる（[bulletproof-react](https://github.com/alan2207/bulletproof-react) の `src/app` にならった）。
 
 ```
 frontend/src/
-├── main.tsx                  エントリ（QueryClientProvider と RouterProvider を置く）
-├── routes.tsx                ルート定義（アプリとテストで同じものを使う）
-├── pages/
+├── main.tsx                  エントリ。デモ版の準備をして、<App /> を描くだけ
+├── app/
+│   ├── index.tsx             App：AppProvider の中に AppRouter を置く
+│   ├── provider.tsx          アプリ全体の Provider（エラーバウンダリー、QueryClientProvider、Toaster、DemoBanner）
+│   ├── router.tsx            createBrowserRouter でルーターを作り、RouterProvider で描く
+│   └── routes/
+│       ├── index.tsx         ルート定義（アプリとテストで同じものを使う）。ページは lazy で読み込む
+│       ├── RootLayout.tsx    すべてのページの親。ページの読み込み中に上端の帯を出す
+│       ├── RouteErrorBoundary.tsx ページの描画中のエラーを受け止める画面
+│       ├── PageLoading.tsx   最初のページを読み込んでいる間の表示
+│       └── NotFoundPage.tsx  どのルートにも当てはまらない URL
+├── pages/                    URL ごとのページ。features の部品を組み合わせる
 │   ├── BoardListPage.tsx     /
 │   ├── BoardPage.tsx         /boards/:boardId
 │   └── CardDetailRoute.tsx   /boards/:boardId/cards/:cardId（BoardPage の子ルート）
@@ -31,7 +40,9 @@ frontend/src/
 │   ├── ui/                   shadcn/ui が生成した部品（button, dialog, sonner など）。直接は編集しない
 │   ├── AddItemForm.tsx       「+ ○○を追加」から入力欄に切り替わるフォーム
 │   ├── ConfirmDialog.tsx     削除前の確認ダイアログ（alert-dialog を使う）
+│   ├── ErrorFallback.tsx     描画中のエラーを受け止めたときに出す画面（メッセージ、再試行、一覧へのリンク）
 │   ├── InlineEdit.tsx        見出しをクリックしてその場で名前を変える部品（ボード名・カラム名）
+│   ├── SectionErrorBoundary.tsx ページの一部だけを包むエラーバウンダリー（ボードの表示部分）
 │   └── StatusMessage.tsx     読み込み中・エラー・ページが見つからないときの表示
 ├── lib/
 │   ├── utils.ts              shadcn/ui が使う cn()（クラス名の結合）
@@ -44,28 +55,46 @@ frontend/src/
 
 - Step 1〜3（API なし）の間は `api.ts` と `queries.ts` を作らず、`features/boards/boardReducer.ts` で状態を管理する
 - Step 5 からは、カラムとカードの変更もすべて `useBoardAction` を通すので、`columns/` と `cards/` には `queries.ts` を作らない
+- `app/` は「アプリをどう組み立てるか」、`pages/` は「その URL で何を出すか」、`features/` は「ボード・カラム・カードの機能」と、役割で分ける。bulletproof-react ではページも `app/routes/` に置くが、ここでは Step 6 までと同じ `pages/` に残し、`app/routes/` にはルートの枠組み（レイアウト、エラー、404）だけを置いた
 - import は `@/`（`src/` を指す別名）で書く。例：`import { Button } from '@/components/ui/button'`
 - `components/ui/` は shadcn/ui のコマンドで追加・更新するファイルなので、lint の対象から外している。見た目を変えたいときは、使う側で `className` を渡す
 
 ## コンポーネント構成
 
 ```
+App
+├── AppProvider             app/provider.tsx
+│   ├── ErrorBoundary       react-error-boundary。ルーターの外のエラーを受け止める（「再試行」でクエリもリセット）
+│   │   └── QueryClientProvider
+│   │       ├── AppRouter   app/router.tsx（RouterProvider）
+│   │       └── Toaster     通知（sonner）の表示場所
+│   └── DemoBanner          デモ版だけ。エラー画面でも押せるよう、エラーバウンダリーの外に置く
+└── ルート（app/routes/index.tsx）
+    └── RootLayout          ErrorBoundary: RouteErrorBoundary、HydrateFallback: PageLoading
+        ├── BoardListPage   /（lazy）
+        ├── BoardPage       /boards/:boardId（lazy）
+        │   └── CardDetailRoute  cards/:cardId（lazy）
+        └── NotFoundPage    *
+
 BoardListPage
 ├── BoardTile × n           クリックでボードを開く。× で削除（ConfirmDialog）
 └── AddItemForm             ボードの作成。作ったらそのボードを開く
 
-BoardPage
-├── BoardHeader             一覧に戻るリンクと、ボード名のインライン編集（InlineEdit）
-├── DndContext              dnd-kit のドラッグ範囲（設定は useBoardDnd が返す）
-│   ├── SortableContext     カラムの並び（横方向）
-│   │   └── BoardColumn × n カラム自体も並び替えられる
-│   │       ├── ColumnHeader    ドラッグ用の取っ手、タイトルのインライン編集、削除ボタン（ConfirmDialog）
-│   │       ├── SortableContext カードの並び（縦方向）。id はカラムの ID
-│   │       │   └── CardItem × n  クリックか Enter で CardDetailModal を開く
-│   │       └── AddItemForm     カードの追加
-│   ├── AddItemForm         カラムの追加
-│   └── DragOverlay         ドラッグ中に指やマウスに付いていく表示（CardPreview / ColumnPreview）
-└── <Outlet />              子ルート。URL に /cards/:cardId があるときだけ CardDetailRoute → CardDetailModal
+BoardPage                   ボードの取得。読み込み中・取得のエラーはここで出す
+└── BoardView
+    ├── BoardHeader         一覧に戻るリンクと、ボード名のインライン編集（InlineEdit）
+    ├── SectionErrorBoundary  中が壊れても、ヘッダーは残る
+    │   └── BoardColumns
+    │       └── DndContext  dnd-kit のドラッグ範囲（設定は useBoardDnd が返す）
+    │           ├── SortableContext     カラムの並び（横方向）
+    │           │   └── BoardColumn × n カラム自体も並び替えられる
+    │           │       ├── ColumnHeader    ドラッグ用の取っ手、タイトルのインライン編集、削除ボタン（ConfirmDialog）
+    │           │       ├── SortableContext カードの並び（縦方向）。id はカラムの ID
+    │           │       │   └── CardItem × n  クリックか Enter で CardDetailModal を開く
+    │           │       └── AddItemForm     カードの追加
+    │           ├── AddItemForm         カラムの追加
+    │           └── DragOverlay         ドラッグ中に指やマウスに付いていく表示（CardPreview / ColumnPreview）
+    └── <Outlet />          子ルート。URL に /cards/:cardId があるときだけ CardDetailRoute → CardDetailModal
 ```
 
 ## 状態をどこに置くか
@@ -194,7 +223,7 @@ type NormalizedBoard = {
 
 ### ルート
 
-`routes.tsx` に定義し、`main.tsx` では `createBrowserRouter`（ブラウザの URL）、テストでは `createMemoryRouter`（メモリ上の URL）に同じ定義を渡す。
+`app/routes/index.tsx` に定義し、`app/router.tsx` では `createBrowserRouter`（ブラウザの URL）、テストでは `createMemoryRouter`（メモリ上の URL）に同じ定義を渡す。すべてのページは、path を持たない親ルート（`RootLayout`）の子にしている。親にエラー画面と読み込み中の表示を1つずつ付ければ、全ページに効くため。
 
 | パス                             | コンポーネント    | 内容                                                       |
 | -------------------------------- | ----------------- | ---------------------------------------------------------- |
@@ -209,17 +238,18 @@ type NormalizedBoard = {
 - カードを開くと URL が `/cards/:cardId` に変わる。ブラウザの「戻る」で閉じ、「進む」で開き直せる。URL を直接開いても、リロードしても開いたままになる
 - 存在しないカードの URL（削除されたカードなど）は、`<Navigate replace />` でボードに戻す。`replace` にすると、「戻る」でその URL に戻ってこない
 
-### エラーの表示
+### 取得のエラーの表示
 
 - 存在しないボード（404）は「ボードが見つかりません」と一覧へのリンクを出す。何度読み込んでも結果は変わらないので、再読み込みボタンは出さない
 - 4xx のエラーは自動で再試行しない（`lib/queryClient.ts`）
+- 描画中のエラー（プログラムの不具合など）は別の仕組みで受け止める（「エラー処理」の節）
 
 ### 画面のテスト（React Testing Library）
 
 - `vite.config.ts` の `test.environment` を `jsdom` にして、Node の上で DOM を使えるようにする
 - 要素は、画面に見えている文字や役割（`getByRole('button', { name: '追加' })` など）で探す。利用者と同じ見え方でテストするため、クラス名や内部の構造には頼らない
 - 操作は `userEvent` で、クリックやキー入力を実際の順番どおりに起こす。日本語入力の変換中の Enter（`isComposing`）だけは `userEvent` で再現できないので `fireEvent` を使う
-- `routes.test.tsx` では、ボード一覧からの作成、カードの URL を直接開く、存在しない URL、一覧の取得に失敗したときの表示、を確かめる
+- `routes.test.tsx` では、アプリと同じルート定義（`app/routes/index.tsx`）を使い、ボード一覧からの作成、カードの URL を直接開く、存在しない URL、一覧の取得に失敗したときの表示、を確かめる
 
 ### API を MSW で受ける
 
@@ -231,6 +261,76 @@ type NormalizedBoard = {
 - 特定のテストだけエラーを返したいときは、そのテストの中で `server.use(http.get(...))` を呼ぶ。足したハンドラーは元のハンドラーより先に使われ、テストが終わると `resetHandlers` で外れる。`{ once: true }` を付けると1回だけ使われる
 - `src/demo/handlers.ts` は、デモ版では150ms 待ってから返すが、テスト（`import.meta.env.MODE` が `test`）では待たせない。それでもレスポンスは非同期に届くので、画面の変化は `findBy〜`（見つかるまで待つ）で確かめる
 - reducer や `apiClient.ts` など、画面を描かない `*.test.ts` は、今までどおり `vi.stubGlobal` で `fetch` を差し替えて、渡した引数や返り値を細かく確かめる
+
+## エラー処理
+
+[react-error-boundary](https://github.com/bvaughn/react-error-boundary) と React Router のルートの `ErrorBoundary` を使い、描画中のエラーで画面全体が真っ白にならないようにする。
+
+### 2種類のエラー
+
+| 種類             | 例                                                           | 受け止め方                                                                                     |
+| ---------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| 取得・保存の失敗 | サーバーが止まっている、存在しないボード、入力エラー         | 取得は `useQuery` の `isError` を見てページの中で出す（`StatusMessage`）。保存は通知（sonner） |
+| 描画中のエラー   | `undefined` のプロパティを読んだ、ページのファイルが読めない | エラーバウンダリーが受け止め、壊れた部分の代わりに `ErrorFallback` を出す                      |
+
+React は、描画中に throw されたエラーを、いちばん近い**エラーバウンダリー**（エラーを受け止める部品）まで伝える。どこにもなければ画面全体が消える。イベントハンドラーや `await` の後で起きたエラーは描画中ではないので、エラーバウンダリーには届かない（保存の失敗を `onError` で通知にしているのはそのため）。
+
+### 3つの段階
+
+内側ほど、壊れる範囲が狭い。エラーは、起きた場所から外に向かって、最初に見つかったエラーバウンダリーで止まる。
+
+| 段階         | 場所                                                            | 範囲                               | ボタン     |
+| ------------ | --------------------------------------------------------------- | ---------------------------------- | ---------- |
+| ページの一部 | `components/SectionErrorBoundary.tsx`（`BoardPage` で使う）     | カラムとカード。ヘッダーは残る     | 再試行     |
+| ページ       | `app/routes/RouteErrorBoundary.tsx`（ルートの `ErrorBoundary`） | ページ全体                         | 再読み込み |
+| アプリ全体   | `app/provider.tsx`（react-error-boundary の `ErrorBoundary`）   | ルーターの外（Provider、通知など） | 再試行     |
+
+- **ページの一部**：ボードの表示で壊れても、一覧に戻るリンクとボード名は残る。`resetKeys={[board]}` を渡しているので、ほかのタブから戻って取り直したときなど、ボードのデータが変わったら自動でエラーの表示をやめて描き直す
+- **ページ**：React Router のルートに `ErrorBoundary` を付けると、そのルートの中で起きた描画中のエラーを受け止め、ページの代わりに描く。エラーは props ではなく `useRouteError()` で受け取る。ページのファイル（`lazy`）の読み込みに失敗したときもここに来る。公開し直すとファイル名が変わり、開いたままの画面からは古いファイルを読めなくなるので、ボタンは「再読み込み」（`location.reload()`）にしている
+- **アプリ全体**：ページのエラーは React Router が先に受け止めるので、ここに来るのはルーターの外で起きたエラーだけ。最後の砦として置く。ルーターの外なので、一覧へのリンクは `<Link>` ではなく `<a>` にしている
+
+### 「再試行」でクエリもリセットする
+
+`ErrorBoundary` の `onReset` に、TanStack Query の `useQueryErrorResetBoundary()` が返す `reset` を渡す。
+
+```tsx
+const { reset } = useQueryErrorResetBoundary()
+return (
+  <ErrorBoundary FallbackComponent={AppErrorFallback} onReset={reset}>
+    …
+  </ErrorBoundary>
+)
+```
+
+`throwOnError` や `useSuspenseQuery` を使うクエリは、失敗するとエラーを throw してエラーバウンダリーに知らせる。そのまま描き直すと、失敗したままのキャッシュでまた throw してしまうので、`reset` で「次に描くときは取り直す」ように印を付けておく。今のアプリのクエリは `isError` を見てページの中でエラーを出しているので throw しないが、あとで `useSuspenseQuery` などに切り替えても「再試行」がそのまま働くようにしている。
+
+### エラーを起こして確かめる
+
+エラー画面は普段は出ないので、変更したときは、描画中に throw する一時的なコードを入れて確かめる（確かめたら消す）。
+
+```tsx
+// 例：BoardColumns の中に入れると、ボードの表示部分だけがエラーの表示に替わる
+if (localStorage.getItem('boom')) throw new Error('テスト用のエラー')
+```
+
+## ページの遅延読み込み
+
+ルートの `lazy` で、ページのファイルを初めてその URL を開いたときに読み込む。ビルドすると、ページごとに JS のファイルが分かれる（`BoardListPage-xxxx.js`、`BoardPage-xxxx.js`、`CardDetailRoute-xxxx.js`）。ボード一覧だけを見る人は、ドラッグ&ドロップ（dnd-kit）のコードを読み込まずに済む。
+
+```tsx
+{
+  path: 'boards/:boardId',
+  lazy: async () => {
+    const { BoardPage } = await import('@/pages/BoardPage')
+    return { Component: BoardPage }
+  },
+}
+```
+
+- `import()`（動的 import）と書くと、Vite がそのファイルを別のファイルに分けてビルドする。`import ... from` と書いたファイルは、分けられずに最初のファイルに入る
+- 読み込み中の表示は2つある。最初に開いたページの読み込み中は、ルートの `HydrateFallback`（`PageLoading`）を出す。ページを移るときは、読み込みが終わるまで今のページが残るので、`RootLayout` が `useNavigation()` の `state === 'loading'` の間だけ、画面の上端に帯を出す
+- 一度読み込んだページは、次からはすぐ表示される
+- 新しいページを足すときも、`app/routes/index.tsx` に `lazy` で書く
 
 ## デモ版（GitHub Pages）
 
@@ -247,6 +347,7 @@ https://kiyohara1021.github.io/kanban-board/ で公開している。GitHub Page
 | `src/demo/DemoBanner.tsx` | 「デモ版」の表示と、データを初期状態に戻すボタン                                                                                 |
 
 - `npm run build:demo`（`vite build --mode demo`）で、`.env.demo` の `VITE_DEMO=true` が読み込まれる。`main.tsx` はそのときだけ、デモ用のコードを動的 import で読み込み、MSW の準備が終わってから画面を描く。通常のビルドには MSW が含まれない
+- `DemoBanner` は `app/provider.tsx` が、デモ版のときだけ表示する
 - Service Worker のファイル（`mockServiceWorker.js`）は、`vite.config.ts` の `msw/vite` プラグイン（`worker-only` モード）がデモ版のビルドのときだけ出力する。リポジトリには入れない
 - データは訪れた人のブラウザに保存されるので、ほかの人のデータを壊すことはない
 
