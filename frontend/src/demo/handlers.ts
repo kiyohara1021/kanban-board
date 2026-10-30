@@ -9,8 +9,9 @@ type Result = { status?: number; json?: unknown }
 // localStorage から読み込み、処理し、保存して、バックエンドと同じ形のレスポンスを返す
 function route(action: (db: DemoDb, params: Params, body: unknown) => Result) {
   return async ({ params, request }: { params: PathParams; request: Request }) => {
-    // 本物のサーバーらしく少し待たせる。楽観的更新で画面が先に変わる様子が分かる
-    await delay(150)
+    // 本物のサーバーらしく少し待たせる。楽観的更新で画面が先に変わる様子が分かる。
+    // 画面のテスト（Vitest では MODE が 'test'）では待たせず、テストを速く、安定させる
+    await delay(import.meta.env.MODE === 'test' ? 0 : 150)
 
     let body: unknown
     if (request.method === 'POST' || request.method === 'PATCH') {

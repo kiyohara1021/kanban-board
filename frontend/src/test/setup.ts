@@ -1,9 +1,28 @@
 // expect(...).toBeInTheDocument() など、DOM 用の判定を使えるようにする
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
-import { afterEach } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest'
+import { saveDb } from '@/demo/db'
+import { server } from './server'
 
-// テストごとに、描画した画面を片付ける（Vitest の globals を使っていないので、自分で登録する）
+// テストの間だけ、/api へのリクエストを MSW が受け取る。
+// ハンドラーのない URL に送ったらテストを失敗させ、URL の書き間違いにすぐ気付けるようにする
+beforeAll(() => {
+  server.listen({ onUnhandledFrame: 'error' })
+})
+
+// テストごとに DB を空にする。何も保存していないとサンプルが作られるので、空の DB を保存しておく
+beforeEach(() => {
+  saveDb({ boards: [], columns: [], cards: [] })
+})
+
+// テストごとに、描画した画面を片付ける（Vitest の globals を使っていないので、自分で登録する）。
+// server.use で足したハンドラーも外し、ほかのテストに影響しないようにする
 afterEach(() => {
   cleanup()
+  server.resetHandlers()
+})
+
+afterAll(() => {
+  server.close()
 })

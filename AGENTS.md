@@ -77,15 +77,17 @@ npm run build:demo              # GitHub Pages 用のデモ版（確認は npm r
 
 ## テスト
 
-| 対象                                  | 場所                            | 方法                                                               |
-| ------------------------------------- | ------------------------------- | ------------------------------------------------------------------ |
-| 並び順の計算                          | `shared/src/position.test.ts`   | Vitest                                                             |
-| reducer、API クライアント、sendAction | `frontend/src/**/*.test.ts`     | Vitest。fetch は `vi.stubGlobal` で偽物にする                      |
-| 画面                                  | `frontend/src/**/*.test.tsx`    | React Testing Library（jsdom）。要素は role と表示される文字で探す |
-| API                                   | `backend/test/api.test.ts`      | Supertest。テスト専用の `prisma/test.db` を毎回作り直す            |
-| デモ版の API                          | `frontend/src/demo/api.test.ts` | Vitest。バックエンドの API テストと同じ規則で動くことを確かめる    |
+| 対象                                  | 場所                            | 方法                                                                                                                                        |
+| ------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| 並び順の計算                          | `shared/src/position.test.ts`   | Vitest                                                                                                                                      |
+| reducer、API クライアント、sendAction | `frontend/src/**/*.test.ts`     | Vitest。fetch は `vi.stubGlobal` で偽物にする                                                                                               |
+| 画面                                  | `frontend/src/**/*.test.tsx`    | React Testing Library（jsdom）。API は MSW（`frontend/src/test/server.ts`）がデモ版のハンドラーで受ける。要素は role と表示される文字で探す |
+| API                                   | `backend/test/api.test.ts`      | Supertest。テスト専用の `prisma/test.db` を毎回作り直す                                                                                     |
+| デモ版の API                          | `frontend/src/demo/api.test.ts` | Vitest。バックエンドの API テストと同じ規則で動くことを確かめる                                                                             |
 
 - 画面のテストでは、クラス名や DOM の構造ではなく `getByRole('button', { name: '追加' })` のように探す
+- 画面のテストでは `fetch` を差し替えない。`frontend/src/test/setup.ts` が MSW のサーバーを起動し、テストごとに DB（jsdom の `localStorage`）を空にするので、データは `saveDb` で用意する。特定のテストだけエラーを返すときは、そのテストの中で `server.use` を呼ぶ
+- `frontend/src/demo/handlers.ts` は画面のテストでも使うので、変えたら `npm test` で画面のテストも通ることを確かめる
 - 画面の変更は、テストに加えて `npm run dev` でブラウザでも確かめる。ドラッグ&ドロップはマウスとキーボード（Space・矢印キー）の両方で確認する
 
 ## ドキュメントの更新

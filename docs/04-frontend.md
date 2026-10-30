@@ -37,7 +37,9 @@ frontend/src/
 │   ├── utils.ts              shadcn/ui が使う cn()（クラス名の結合）
 │   ├── apiClient.ts          fetch の共通処理（ベース URL、エラー変換）
 │   └── queryClient.ts        TanStack Query の設定
-└── test/setup.ts             テストの初期設定（jest-dom の読み込み、画面の片付け）
+└── test/
+    ├── setup.ts              テストの初期設定（jest-dom の読み込み、MSW のサーバーの起動・終了、テストごとの片付け）
+    └── server.ts             画面のテストで /api を受ける MSW のサーバー（demo/handlers.ts を使い回す）
 ```
 
 - Step 1〜3（API なし）の間は `api.ts` と `queries.ts` を作らず、`features/boards/boardReducer.ts` で状態を管理する
@@ -217,7 +219,18 @@ type NormalizedBoard = {
 - `vite.config.ts` の `test.environment` を `jsdom` にして、Node の上で DOM を使えるようにする
 - 要素は、画面に見えている文字や役割（`getByRole('button', { name: '追加' })` など）で探す。利用者と同じ見え方でテストするため、クラス名や内部の構造には頼らない
 - 操作は `userEvent` で、クリックやキー入力を実際の順番どおりに起こす。日本語入力の変換中の Enter（`isComposing`）だけは `userEvent` で再現できないので `fireEvent` を使う
-- `routes.test.tsx` では fetch を偽物に差し替え、ボード一覧からの作成、カードの URL を直接開く、存在しない URL、を確かめる
+- `routes.test.tsx` では、ボード一覧からの作成、カードの URL を直接開く、存在しない URL、一覧の取得に失敗したときの表示、を確かめる
+
+### API を MSW で受ける
+
+画面のテストでは、`fetch` を `vi.stubGlobal` で差し替えず、MSW（`msw/node` の `setupServer`）で `/api` へのリクエストを受ける。`fetch` を差し替えると「どの URL に何を返すか」をテストごとに書くことになり、本物の API とずれても気付けない。MSW なら `fetch` と `apiClient.ts` は本物のまま動き、ネットワークの手前で受け取るだけになる。
+
+- ハンドラーはデモ版の `src/demo/handlers.ts` をそのまま使う。デモ版の API は `backend/src/services/` と同じ規則で動く（`demo/api.test.ts` で確かめている）ので、画面のテストもバックエンドに近い動きで試せる
+- DB は jsdom の `localStorage`。`test/setup.ts` がテストごとに空の DB を保存するので、テストは必要なデータを `saveDb` で用意してから画面を描く。保存されたかどうかは `loadDb` で確かめる
+- `test/setup.ts` は、全テストの前に `server.listen()`、各テストのあとに `server.resetHandlers()`、最後に `server.close()` を呼ぶ。ハンドラーのない URL へのリクエストは、`onUnhandledFrame: 'error'` でテストを失敗させる
+- 特定のテストだけエラーを返したいときは、そのテストの中で `server.use(http.get(...))` を呼ぶ。足したハンドラーは元のハンドラーより先に使われ、テストが終わると `resetHandlers` で外れる。`{ once: true }` を付けると1回だけ使われる
+- `src/demo/handlers.ts` は、デモ版では150ms 待ってから返すが、テスト（`import.meta.env.MODE` が `test`）では待たせない。それでもレスポンスは非同期に届くので、画面の変化は `findBy〜`（見つかるまで待つ）で確かめる
+- reducer や `apiClient.ts` など、画面を描かない `*.test.ts` は、今までどおり `vi.stubGlobal` で `fetch` を差し替えて、渡した引数や返り値を細かく確かめる
 
 ## デモ版（GitHub Pages）
 
@@ -225,13 +238,13 @@ https://kiyohara1021.github.io/kanban-board/ で公開している。GitHub Page
 
 ### 仕組み
 
-| ファイル                  | 役割                                                                                             |
-| ------------------------- | ------------------------------------------------------------------------------------------------ |
-| `src/demo/db.ts`          | バックエンドの3つのテーブルと同じ形のデータを `localStorage` に保存する。初回はサンプルを作る    |
-| `src/demo/api.ts`         | 14本のエンドポイントの処理。`backend/src/services/` と同じ規則で、検証と並び順は shared を使う   |
-| `src/demo/handlers.ts`    | MSW のハンドラー。URL と処理を結び付け、バックエンドと同じ形のレスポンスを返す（150ms 待たせる） |
-| `src/demo/browser.ts`     | Service Worker を登録して、`/api` へのリクエストを受け取り始める                                 |
-| `src/demo/DemoBanner.tsx` | 「デモ版」の表示と、データを初期状態に戻すボタン                                                 |
+| ファイル                  | 役割                                                                                                                             |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `src/demo/db.ts`          | バックエンドの3つのテーブルと同じ形のデータを `localStorage` に保存する。初回はサンプルを作る                                    |
+| `src/demo/api.ts`         | 14本のエンドポイントの処理。`backend/src/services/` と同じ規則で、検証と並び順は shared を使う                                   |
+| `src/demo/handlers.ts`    | MSW のハンドラー。URL と処理を結び付け、バックエンドと同じ形のレスポンスを返す（デモ版では150ms 待たせる）。画面のテストでも使う |
+| `src/demo/browser.ts`     | Service Worker を登録して、`/api` へのリクエストを受け取り始める                                                                 |
+| `src/demo/DemoBanner.tsx` | 「デモ版」の表示と、データを初期状態に戻すボタン                                                                                 |
 
 - `npm run build:demo`（`vite build --mode demo`）で、`.env.demo` の `VITE_DEMO=true` が読み込まれる。`main.tsx` はそのときだけ、デモ用のコードを動的 import で読み込み、MSW の準備が終わってから画面を描く。通常のビルドには MSW が含まれない
 - Service Worker のファイル（`mockServiceWorker.js`）は、`vite.config.ts` の `msw/vite` プラグイン（`worker-only` モード）がデモ版のビルドのときだけ出力する。リポジトリには入れない
