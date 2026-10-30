@@ -1,51 +1,10 @@
-import type { Board, Card, Column } from '@kanban/shared'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
-import { createMemoryRouter, RouterProvider } from 'react-router'
 import { describe, expect, it } from 'vitest'
-import { loadDb, saveDb } from '@/demo/db'
+import { loadDb } from '@/demo/db'
+import { renderApp, saveSampleBoard } from '@/test/renderApp'
 import { server } from '@/test/server'
-import { routes } from '@/app/routes'
-
-const time = '2026-11-01T00:00:00.000Z'
-const board: Board = { id: 'b1', title: 'マイボード', createdAt: time, updatedAt: time }
-const column: Column = {
-  id: 'c1',
-  boardId: 'b1',
-  title: 'ToDo',
-  position: 1000,
-  createdAt: time,
-  updatedAt: time,
-}
-const card: Card = {
-  id: 'k1',
-  columnId: 'c1',
-  title: 'テストを書く',
-  description: 'React Testing Library を使う',
-  position: 1000,
-  createdAt: time,
-  updatedAt: time,
-}
-
-// API は MSW（src/test/server.ts）が受ける。DB は各テストの前に空になるので、
-// 必要なデータをテストの最初に保存しておく。DB はバックエンドと同じく、テーブルごとの平らな配列
-function saveSampleBoard() {
-  saveDb({ boards: [board], columns: [column], cards: [card] })
-}
-
-// アプリと同じルート定義を、ブラウザの URL ではなくメモリ上の URL で動かす
-function renderApp(path: string) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  const router = createMemoryRouter(routes, { initialEntries: [path] })
-  render(
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>,
-  )
-  return router
-}
 
 describe('画面の移動', () => {
   it('ボード一覧から、ボードを作るとそのボードが開く', async () => {

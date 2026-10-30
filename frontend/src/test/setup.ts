@@ -1,6 +1,7 @@
 // expect(...).toBeInTheDocument() など、DOM 用の判定を使えるようにする
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
+import { toast } from 'sonner'
 import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest'
 import { saveDb } from '@/demo/db'
 import { server } from './server'
@@ -17,10 +18,13 @@ beforeEach(() => {
 })
 
 // テストごとに、描画した画面を片付ける（Vitest の globals を使っていないので、自分で登録する）。
-// server.use で足したハンドラーも外し、ほかのテストに影響しないようにする
+// server.use で足したハンドラーも外し、ほかのテストに影響しないようにする。
+// 通知（sonner）は画面とは別に表示中の一覧を持ち、次に描画した Toaster がそれを引き継ぐので、
+// 前のテストのエラー通知が残らないように消しておく
 afterEach(() => {
   cleanup()
   server.resetHandlers()
+  toast.dismiss()
 })
 
 afterAll(() => {

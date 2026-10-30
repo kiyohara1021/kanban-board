@@ -50,7 +50,8 @@ frontend/src/
 │   └── queryClient.ts        TanStack Query の設定
 └── test/
     ├── setup.ts              テストの初期設定（jest-dom の読み込み、MSW のサーバーの起動・終了、テストごとの片付け）
-    └── server.ts             画面のテストで /api を受ける MSW のサーバー（demo/handlers.ts を使い回す）
+    ├── server.ts             画面のテストで /api を受ける MSW のサーバー（demo/handlers.ts を使い回す）
+    └── renderApp.tsx         画面のテストで使うサンプルのデータと、ルート定義ごとアプリを描く renderApp
 ```
 
 - Step 1〜3（API なし）の間は `api.ts` と `queries.ts` を作らず、`features/boards/boardReducer.ts` で状態を管理する
@@ -249,7 +250,17 @@ type NormalizedBoard = {
 - `vite.config.ts` の `test.environment` を `jsdom` にして、Node の上で DOM を使えるようにする
 - 要素は、画面に見えている文字や役割（`getByRole('button', { name: '追加' })` など）で探す。利用者と同じ見え方でテストするため、クラス名や内部の構造には頼らない
 - 操作は `userEvent` で、クリックやキー入力を実際の順番どおりに起こす。日本語入力の変換中の Enter（`isComposing`）だけは `userEvent` で再現できないので `fireEvent` を使う
-- `routes.test.tsx` では、アプリと同じルート定義（`app/routes/index.tsx`）を使い、ボード一覧からの作成、カードの URL を直接開く、存在しない URL、一覧の取得に失敗したときの表示、を確かめる
+- ページのテストは `test/renderApp.tsx` の `renderApp(path)` で描く。アプリと同じルート定義（`app/routes/index.tsx`）を `createMemoryRouter` で動かし、テストごとに新しい `QueryClient` を作る。保存の失敗を知らせる通知も確かめられるよう、`Toaster` も一緒に描く
+
+| ファイル                         | 確かめること                                                                                  |
+| -------------------------------- | --------------------------------------------------------------------------------------------- |
+| `routes.test.tsx`                | ボード一覧からの作成、カードの URL を直接開く、存在しない URL、一覧の取得に失敗したときの表示 |
+| `pages/BoardListPage.test.tsx`   | ボードがないときの表示、ボードの削除（確認とキャンセル）                                      |
+| `pages/BoardPage.test.tsx`       | ボード名・カラムの名前変更、カラムとカードの追加・削除、保存に失敗したときに元に戻すこと      |
+| `pages/CardDetailRoute.test.tsx` | カード詳細での保存・キャンセル・削除、タイトルが空のときは保存できないこと                    |
+
+- 楽観的更新の途中（保存の結果が届く前）の画面を確かめるときは、`server.use` のハンドラーの中で Promise を待たせ、応答を止めておく。すぐに応答すると、確かめる前に結果が届いてしまう
+- 通知（sonner）は表示中の一覧を画面とは別に持ち、次に描いた `Toaster` がそれを引き継ぐ。前のテストの通知が残らないよう、`test/setup.ts` で各テストのあとに `toast.dismiss()` を呼ぶ
 
 ### API を MSW で受ける
 
