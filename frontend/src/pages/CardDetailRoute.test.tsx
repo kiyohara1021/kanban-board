@@ -184,4 +184,18 @@ describe('カード詳細の期限日', () => {
     expect(screen.getByRole('button', { name: 'カード「テストを書く」' })).toBeInTheDocument()
     await waitFor(() => expect(loadDb().cards[0]?.dueDate).toBeNull())
   })
+
+  it('年が5桁以上の日付は、ブラウザが保存の前に止める', async () => {
+    const { user } = await openCard()
+
+    // Chrome では、年の欄に数字を続けて打つと6桁の年になることがある
+    const input = screen.getByLabelText('期限日')
+    await user.type(input, '202610-10-20')
+    expect(input).toBeInvalid()
+    await user.click(screen.getByRole('button', { name: '保存' }))
+
+    // form が送信されないので、ダイアログは開いたままで、何も保存しない
+    expect(screen.getByRole('dialog', { name: 'カードの編集' })).toBeInTheDocument()
+    expect(loadDb().cards[0]?.dueDate).toBeNull()
+  })
 })

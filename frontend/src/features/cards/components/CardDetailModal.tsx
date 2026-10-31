@@ -119,6 +119,10 @@ export function CardDetailModal({
                 ref={dueDateRef}
                 id={dueDateId}
                 type="date"
+                // Chrome の年の欄は、上限がないと6桁まで入り（数字を続けて打つと「202610」年になる）、
+                // 保存するとサーバーで 400 になる。上限を付けると年の欄が4桁になり、
+                // 範囲外の値はブラウザが保存（form の送信）の前に止めて知らせてくれる
+                max="9999-12-31"
                 value={dueDate}
                 onChange={(event) => setDueDate(event.target.value)}
                 className="w-auto"
