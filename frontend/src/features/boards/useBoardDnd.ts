@@ -21,7 +21,7 @@ import {
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { useCallback, useEffect, useRef, useState, type Dispatch } from 'react'
 import { boardReducer, findCard, findColumnOfCard, type BoardAction } from './boardReducer'
-import type { BoardDetail } from '@kanban/shared'
+import type { BoardDetail, Card } from '@kanban/shared'
 
 // useSortable の data に入れる値。ドラッグしているのがカードかカラムかを見分けるのに使う
 export type DragData = { type: 'card' } | { type: 'column' }
@@ -121,6 +121,23 @@ const announcements: Announcements = {
   onDragCancel: () => '移動を取り消しました。',
 }
 
+/**
+ * カードを落としたときの、moveCard の index（カラムの中で何番目に入れるか）を返す。
+ * cards は、ドラッグ中のカードと、絞り込みで隠れているカードも含めたカラムのすべてのカード。
+ *
+ * 重ねたカード（over）が今いる番号に入れる。moveCard はカードを抜いてから入れるので、
+ * 下へ動かしたときは重ねたカードの直後、上へ動かしたときは直前に入る（dnd-kit の見た目と同じ）。
+ * 画面に表示しているカードだけの並びで数えると、隠れているカードの分だけ保存する位置がずれる
+ */
+export function cardDropIndex(cards: Card[], activeId: string, overId: string): number {
+  const overIndex = cards.findIndex((card) => card.id === overId)
+  // カードのない場所（カラムそのもの）に落としたときは、今の位置のまま
+  if (overIndex === -1) return cards.findIndex((card) => card.id === activeId)
+  return overIndex
+}
+
+// board には、絞り込む前のボードを渡す。並び順の計算に、隠れているカードも含めた並びが要るため。
+// 絞り込みは、返した shownBoard を表示するときに行う
 export function useBoardDnd(board: BoardDetail, dispatch: Dispatch<BoardAction>) {
   const [activeId, setActiveId] = useState<string | null>(null)
   // カードをドラッグしている間だけ使う仮のボード。カラムをまたいだ移動を、ドロップ前から画面に映すために使う。
@@ -217,9 +234,7 @@ export function useBoardDnd(board: BoardDetail, dispatch: Dispatch<BoardAction>)
     if (!preview) return
     const column = findColumnOfCard(preview, activeKey)
     if (!column) return
-    const overIndex = column.cards.findIndex((card) => card.id === overKey)
-    const index =
-      overIndex === -1 ? column.cards.findIndex((card) => card.id === activeKey) : overIndex
+    const index = cardDropIndex(column.cards, activeKey, overKey)
     dispatch({ type: 'moveCard', cardId: activeKey, toColumnId: column.id, index, now: now() })
   }
 

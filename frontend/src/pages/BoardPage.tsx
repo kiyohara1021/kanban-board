@@ -1,7 +1,7 @@
 import { DndContext, DragOverlay } from '@dnd-kit/core'
 import { horizontalListSortingStrategy, SortableContext } from '@dnd-kit/sortable'
-import { COLUMN_TITLE_MAX, type BoardDetail } from '@kanban/shared'
-import { Link, Outlet, useNavigate, useParams } from 'react-router'
+import { COLUMN_TITLE_MAX, type BoardDetail, type ColumnWithCards } from '@kanban/shared'
+import { Link, Outlet, useLocation, useNavigate, useParams } from 'react-router'
 import { AddItemForm } from '@/components/AddItemForm'
 import { SectionErrorBoundary } from '@/components/SectionErrorBoundary'
 import { StatusMessage } from '@/components/StatusMessage'
@@ -11,7 +11,10 @@ import { BoardHeader } from '@/features/boards/components/BoardHeader'
 import { useBoard, useUpdateBoard } from '@/features/boards/queries'
 import { useBoardAction } from '@/features/boards/useBoardAction'
 import { useBoardDnd } from '@/features/boards/useBoardDnd'
+import { isFiltering, matchesCardFilter, type CardFilter } from '@/features/cards/cardFilter'
+import { CardFilterBar } from '@/features/cards/components/CardFilterBar'
 import { CardPreview } from '@/features/cards/components/CardItem'
+import { useCardFilter } from '@/features/cards/useCardFilter'
 import { BoardColumn, ColumnPreview } from '@/features/columns/components/BoardColumn'
 import { labelsOfCard } from '@/features/labels/labelColors'
 import { ApiError } from '@/lib/apiClient'
@@ -48,14 +51,25 @@ function BoardView({ board }: { board: BoardDetail }) {
   // Step 2〜3 の dispatch と同じ形で呼べる。中で画面の更新と API の呼び出しをする
   const run = useBoardAction(board.id)
   const updateBoard = useUpdateBoard(board.id)
+  // 絞り込みの条件は URL のクエリ（?q=…&label=…）に持つ
+  const { filter, setFilter } = useCardFilter(board.labels)
+  const matchCount = board.columns
+    .flatMap((column) => column.cards)
+    .filter((card) => matchesCardFilter(card, filter)).length
 
   return (
     <div className="flex h-dvh flex-col bg-slate-100">
       <BoardHeader title={board.title} onRename={(title) => updateBoard.mutate({ title })} />
+      <CardFilterBar
+        filter={filter}
+        labels={board.labels}
+        matchCount={matchCount}
+        onChange={setFilter}
+      />
       {/* カラムとカードの表示で描画中のエラーが起きても、ヘッダー（一覧に戻るリンク）は残す。
           エラーバウンダリーは、自分より内側で起きたエラーだけを受け止める */}
       <SectionErrorBoundary resetKeys={[board]}>
-        <BoardColumns board={board} run={run} />
+        <BoardColumns board={board} filter={filter} run={run} />
       </SectionErrorBoundary>
 
       {/* 子ルート（/boards/:boardId/cards/:cardId のカード詳細）がここに表示される */}
@@ -64,11 +78,24 @@ function BoardView({ board }: { board: BoardDetail }) {
   )
 }
 
+type BoardColumnsProps = {
+  board: BoardDetail
+  filter: CardFilter
+  run: (action: BoardAction) => void
+}
+
 // カラムとカードの並び。ドラッグ&ドロップもここで扱う
-function BoardColumns({ board, run }: { board: BoardDetail; run: (action: BoardAction) => void }) {
-  // ドラッグ中は、カラムをまたいだ移動を反映した仮のボード（shownBoard）を表示する
+function BoardColumns({ board, filter, run }: BoardColumnsProps) {
+  // ドラッグ中は、カラムをまたいだ移動を反映した仮のボード（shownBoard）を表示する。
+  // useBoardDnd には絞り込む前のボードを渡し、絞り込みは表示するときだけ行う。
+  // 並び順の計算に、隠れているカードも含めた並びが要るため（docs/04-frontend.md）
   const { shownBoard, activeCard, activeColumn, contextProps } = useBoardDnd(board, run)
   const navigate = useNavigate()
+  // カード詳細を開くときも、絞り込みの条件（?q=…）を URL に残す
+  const { search } = useLocation()
+  const filtering = isFiltering(filter)
+  const shownCardsOf = (column: ColumnWithCards) =>
+    filtering ? column.cards.filter((card) => matchesCardFilter(card, filter)) : column.cards
 
   return (
     <DndContext {...contextProps}>
@@ -81,6 +108,7 @@ function BoardColumns({ board, run }: { board: BoardDetail; run: (action: BoardA
             <BoardColumn
               key={column.id}
               column={column}
+              shownCards={shownCardsOf(column)}
               labels={shownBoard.labels}
               onRename={(title) =>
                 run({ type: 'renameColumn', columnId: column.id, title, now: now() })
@@ -90,7 +118,9 @@ function BoardColumns({ board, run }: { board: BoardDetail; run: (action: BoardA
                 run({ type: 'addCard', id: newId(), columnId: column.id, title, now: now() })
               }
               // 開いているカードは URL で表す。リロードしても開いたままになり、URL を共有できる
-              onOpenCard={(cardId) => navigate(`/boards/${board.id}/cards/${cardId}`)}
+              onOpenCard={(cardId) =>
+                navigate({ pathname: `/boards/${board.id}/cards/${cardId}`, search })
+              }
             />
           ))}
         </SortableContext>
@@ -113,7 +143,13 @@ function BoardColumns({ board, run }: { board: BoardDetail; run: (action: BoardA
             className="rotate-2"
           />
         )}
-        {activeColumn && <ColumnPreview column={activeColumn} labels={shownBoard.labels} />}
+        {activeColumn && (
+          <ColumnPreview
+            column={activeColumn}
+            shownCards={shownCardsOf(activeColumn)}
+            labels={shownBoard.labels}
+          />
+        )}
       </DragOverlay>
     </DndContext>
   )

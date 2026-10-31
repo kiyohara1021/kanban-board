@@ -1,4 +1,4 @@
-import { Navigate, useNavigate, useOutletContext, useParams } from 'react-router'
+import { Navigate, useLocation, useNavigate, useOutletContext, useParams } from 'react-router'
 import { now } from '@/features/boards/actionValues'
 import { findCard } from '@/features/boards/boardReducer'
 import { CardDetailModal } from '@/features/cards/components/CardDetailModal'
@@ -13,7 +13,9 @@ export function CardDetailRoute() {
   const navigate = useNavigate()
   const createLabel = useCreateLabel(board.id)
   const card = findCard(board, cardId)
-  const boardPath = `/boards/${board.id}`
+  // ボードに戻るときも、絞り込みの条件（?q=…&label=…）を残す
+  const { search } = useLocation()
+  const boardPath = { pathname: `/boards/${board.id}`, search }
 
   // 削除されたカードや、間違った URL のときはボードに戻す。
   // replace にすると、戻るボタンでこの URL に戻ってこない
