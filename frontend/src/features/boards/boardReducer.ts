@@ -18,9 +18,13 @@ export type BoardAction =
       cardId: string
       title?: string
       description?: string
+      // 付けた後のラベルの ID をすべて入れる（PATCH /cards/:cardId と同じ）
+      labelIds?: string[]
       now: string
     }
   | { type: 'deleteCard'; cardId: string }
+  // ラベルの作成は楽観的更新をしないので、アクションにはない（features/labels/queries.ts）
+  | { type: 'deleteLabel'; labelId: string }
   // index は移動先での位置（0始まり）。移動する要素自身を除いた並びで数える（docs/03-api.md の /move と同じ）
   | { type: 'moveColumn'; columnId: string; index: number; now: string }
   | { type: 'moveCard'; cardId: string; toColumnId: string; index: number; now: string }
@@ -84,6 +88,7 @@ export function boardReducer(board: BoardDetail, action: BoardAction): BoardDeta
             title: action.title,
             description: '',
             position: nextPosition(column.cards),
+            labelIds: [],
             createdAt: action.now,
             updatedAt: action.now,
           }
@@ -100,6 +105,7 @@ export function boardReducer(board: BoardDetail, action: BoardAction): BoardDeta
                 ...card,
                 title: action.title ?? card.title,
                 description: action.description ?? card.description,
+                labelIds: action.labelIds ?? card.labelIds,
                 updatedAt: action.now,
               }
             : card,
@@ -111,6 +117,27 @@ export function boardReducer(board: BoardDetail, action: BoardAction): BoardDeta
         ...column,
         cards: column.cards.filter((card) => card.id !== action.cardId),
       }))
+
+    // ボードのラベル一覧から消し、付けていたカードからも外す（サーバーのカスケード削除と同じ結果にする）
+    case 'deleteLabel': {
+      const hasLabel = (card: Card) => card.labelIds.includes(action.labelId)
+      const withoutLabel = updateColumn(
+        board,
+        (column) => column.cards.some(hasLabel),
+        (column) => ({
+          ...column,
+          cards: column.cards.map((card) =>
+            hasLabel(card)
+              ? { ...card, labelIds: card.labelIds.filter((id) => id !== action.labelId) }
+              : card,
+          ),
+        }),
+      )
+      return {
+        ...withoutLabel,
+        labels: board.labels.filter((label) => label.id !== action.labelId),
+      }
+    }
 
     case 'moveColumn': {
       const from = board.columns.findIndex((column) => column.id === action.columnId)

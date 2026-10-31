@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { createCard, deleteCard, moveCard, updateCard } from '@/features/cards/api'
 import { createColumn, deleteColumn, moveColumn, updateColumn } from '@/features/columns/api'
+import { deleteLabel } from '@/features/labels/api'
 import { boardReducer, type BoardAction } from './boardReducer'
 import { boardKeys } from './queries'
 
@@ -21,11 +22,17 @@ export function sendAction(boardId: string, action: BoardAction): Promise<unknow
     case 'addCard':
       return createCard(action.columnId, { title: action.title, description: '' })
     case 'updateCard':
-      return updateCard(action.cardId, { title: action.title, description: action.description })
+      return updateCard(action.cardId, {
+        title: action.title,
+        description: action.description,
+        labelIds: action.labelIds,
+      })
     case 'deleteCard':
       return deleteCard(action.cardId)
     case 'moveCard':
       return moveCard(action.cardId, { columnId: action.toColumnId, index: action.index })
+    case 'deleteLabel':
+      return deleteLabel(action.labelId)
   }
 }
 

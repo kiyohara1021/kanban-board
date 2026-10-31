@@ -11,20 +11,43 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { CARD_DESCRIPTION_MAX, CARD_TITLE_MAX, type Card } from '@kanban/shared'
+import { LabelPicker } from '@/features/labels/components/LabelPicker'
+import {
+  CARD_DESCRIPTION_MAX,
+  CARD_TITLE_MAX,
+  type Card,
+  type CreateLabelInput,
+  // ui/label.tsx の Label（入力欄の見出しの部品）と名前がぶつかるので、別名で読み込む
+  type Label as BoardLabel,
+} from '@kanban/shared'
 
 type Props = {
   card: Card
-  onSave: (changes: { title: string; description: string }) => void
+  // ボードのラベル一覧
+  labels: BoardLabel[]
+  onSave: (changes: { title: string; description: string; labelIds: string[] }) => void
   onDelete: () => void
   onClose: () => void
+  onCreateLabel: (input: CreateLabelInput, onCreated: (label: BoardLabel) => void) => void
+  isCreatingLabel: boolean
+  onDeleteLabel: (labelId: string) => void
 }
 
 // 表示したいときだけ描画する（{openCard && <CardDetailModal />}）前提のモーダル
-export function CardDetailModal({ card, onSave, onDelete, onClose }: Props) {
+export function CardDetailModal({
+  card,
+  labels,
+  onSave,
+  onDelete,
+  onClose,
+  onCreateLabel,
+  isCreatingLabel,
+  onDeleteLabel,
+}: Props) {
   // 入力中の値は、保存するまでボードに反映しないので、このコンポーネントの state に持つ
   const [title, setTitle] = useState(card.title)
   const [description, setDescription] = useState(card.description)
+  const [labelIds, setLabelIds] = useState(card.labelIds)
   const trimmedTitle = title.trim()
   // label と入力欄をつなぐ id。画面に同じ部品が複数あっても重ならない値を React が作る
   const titleId = useId()
@@ -49,7 +72,12 @@ export function CardDetailModal({ card, onSave, onDelete, onClose }: Props) {
           onSubmit={(event) => {
             event.preventDefault()
             if (trimmedTitle === '') return
-            onSave({ title: trimmedTitle, description: description.trim() })
+            onSave({
+              title: trimmedTitle,
+              description: description.trim(),
+              // 編集中に削除されたラベルは送らない（サーバーにない ID を送ると 400 になる）
+              labelIds: labelIds.filter((id) => labels.some((label) => label.id === id)),
+            })
             onClose()
           }}
           className="flex flex-col gap-4"
@@ -73,6 +101,18 @@ export function CardDetailModal({ card, onSave, onDelete, onClose }: Props) {
               rows={6}
             />
           </div>
+          <LabelPicker
+            labels={labels}
+            selectedIds={labelIds}
+            onToggle={(labelId) =>
+              setLabelIds((ids) =>
+                ids.includes(labelId) ? ids.filter((id) => id !== labelId) : [...ids, labelId],
+              )
+            }
+            onCreate={onCreateLabel}
+            isCreating={isCreatingLabel}
+            onDelete={onDeleteLabel}
+          />
           <DialogFooter className="sm:justify-between">
             <ConfirmDialog
               trigger={

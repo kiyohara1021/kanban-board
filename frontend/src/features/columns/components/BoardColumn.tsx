@@ -1,15 +1,18 @@
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { GripVertical } from 'lucide-react'
-import { CARD_TITLE_MAX, type ColumnWithCards } from '@kanban/shared'
+import { CARD_TITLE_MAX, type ColumnWithCards, type Label } from '@kanban/shared'
 import { AddItemForm } from '@/components/AddItemForm'
 import type { DragData } from '@/features/boards/useBoardDnd'
 import { CardItem, CardPreview } from '@/features/cards/components/CardItem'
+import { labelsOfCard } from '@/features/labels/labelColors'
 import { cn } from '@/lib/utils'
 import { ColumnHeader } from './ColumnHeader'
 
 type Props = {
   column: ColumnWithCards
+  // ボードのラベル一覧。カードには ID しかないので、ここから名前と色を引く
+  labels: Label[]
   onRename: (title: string) => void
   onDelete: () => void
   onAddCard: (title: string) => void
@@ -18,7 +21,7 @@ type Props = {
 
 const columnClassName = 'flex w-72 shrink-0 flex-col gap-2 rounded-xl bg-slate-200/70 p-2'
 
-export function BoardColumn({ column, onRename, onDelete, onAddCard, onOpenCard }: Props) {
+export function BoardColumn({ column, labels, onRename, onDelete, onAddCard, onOpenCard }: Props) {
   // カラム自体も並び替えられる。カードを空のカラムに落とすときの受け皿にもなる
   const {
     attributes,
@@ -67,7 +70,12 @@ export function BoardColumn({ column, onRename, onDelete, onAddCard, onOpenCard 
         ) : (
           <ul className="flex min-h-0 flex-col gap-2 overflow-y-auto">
             {column.cards.map((card) => (
-              <CardItem key={card.id} card={card} onOpen={() => onOpenCard(card.id)} />
+              <CardItem
+                key={card.id}
+                card={card}
+                labels={labelsOfCard(labels, card)}
+                onOpen={() => onOpenCard(card.id)}
+              />
             ))}
           </ul>
         )}
@@ -84,7 +92,7 @@ export function BoardColumn({ column, onRename, onDelete, onAddCard, onOpenCard 
 }
 
 // カラムをドラッグしている間、マウスに付いていく表示（DragOverlay の中で使う）
-export function ColumnPreview({ column }: { column: ColumnWithCards }) {
+export function ColumnPreview({ column, labels }: { column: ColumnWithCards; labels: Label[] }) {
   return (
     <section
       className={cn(columnClassName, 'max-h-[70dvh] cursor-grabbing overflow-hidden shadow-lg')}
@@ -93,7 +101,7 @@ export function ColumnPreview({ column }: { column: ColumnWithCards }) {
       <ul className="flex flex-col gap-2">
         {column.cards.map((card) => (
           <li key={card.id}>
-            <CardPreview card={card} className="shadow-sm" />
+            <CardPreview card={card} labels={labelsOfCard(labels, card)} className="shadow-sm" />
           </li>
         ))}
       </ul>

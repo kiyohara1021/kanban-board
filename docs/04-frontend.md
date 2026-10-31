@@ -33,9 +33,14 @@ frontend/src/
 │   ├── columns/
 │   │   ├── api.ts
 │   │   └── components/       BoardColumn, ColumnHeader
-│   └── cards/
-│       ├── api.ts
-│       └── components/       CardItem, CardDetailModal
+│   ├── cards/
+│   │   ├── api.ts
+│   │   └── components/       CardItem, CardDetailModal
+│   └── labels/
+│       ├── api.ts            createLabel, deleteLabel
+│       ├── queries.ts        ラベルの作成のフック（楽観的更新をしない）
+│       ├── labelColors.ts    色の名前と Tailwind CSS のクラスの対応、カードのラベルを引く labelsOfCard
+│       └── components/       LabelChip（ラベルの表示）、LabelPicker（カード詳細でのラベルの選択・作成・削除）
 ├── components/
 │   ├── ui/                   shadcn/ui が生成した部品（button, dialog, sonner など）。直接は編集しない
 │   ├── AddItemForm.tsx       「+ ○○を追加」から入力欄に切り替わるフォーム
@@ -55,7 +60,7 @@ frontend/src/
 ```
 
 - Step 1〜3（API なし）の間は `api.ts` と `queries.ts` を作らず、`features/boards/boardReducer.ts` で状態を管理する
-- Step 5 からは、カラムとカードの変更もすべて `useBoardAction` を通すので、`columns/` と `cards/` には `queries.ts` を作らない
+- Step 5 からは、カラムとカードの変更もすべて `useBoardAction` を通すので、`columns/` と `cards/` には `queries.ts` を作らない。`labels/` にだけあるのは、ラベルの作成が楽観的更新をしない例外だから（「ラベル」の節）
 - `app/` は「アプリをどう組み立てるか」、`pages/` は「その URL で何を出すか」、`features/` は「ボード・カラム・カードの機能」と、役割で分ける。bulletproof-react ではページも `app/routes/` に置くが、ここでは Step 6 までと同じ `pages/` に残し、`app/routes/` にはルートの枠組み（レイアウト、エラー、404）だけを置いた
 - import は `@/`（`src/` を指す別名）で書く。例：`import { Button } from '@/components/ui/button'`
 - `components/ui/` は shadcn/ui のコマンドで追加・更新するファイルなので、lint の対象から外している。見た目を変えたいときは、使う側で `className` を渡す
@@ -91,11 +96,15 @@ BoardPage                   ボードの取得。読み込み中・取得のエ�
     │           │   └── BoardColumn × n カラム自体も並び替えられる
     │           │       ├── ColumnHeader    ドラッグ用の取っ手、タイトルのインライン編集、削除ボタン（ConfirmDialog）
     │           │       ├── SortableContext カードの並び（縦方向）。id はカラムの ID
-    │           │       │   └── CardItem × n  クリックか Enter で CardDetailModal を開く
+    │           │       │   └── CardItem × n  ラベル（LabelChip）とタイトル。クリックか Enter で CardDetailModal を開く
     │           │       └── AddItemForm     カードの追加
     │           ├── AddItemForm         カラムの追加
     │           └── DragOverlay         ドラッグ中に指やマウスに付いていく表示（CardPreview / ColumnPreview）
     └── <Outlet />          子ルート。URL に /cards/:cardId があるときだけ CardDetailRoute → CardDetailModal
+
+CardDetailModal             タイトル・説明・ラベルの選択を state に持ち、「保存」でまとめて run する
+├── LabelPicker             ラベルのチェックボックス、削除ボタン（ConfirmDialog）、新しいラベルの名前と色
+└── ConfirmDialog           カードの削除
 ```
 
 ## 状態をどこに置くか
@@ -203,6 +212,7 @@ type NormalizedBoard = {
 | `features/*/api.ts`                 | エンドポイントごとの関数（`getBoard`、`moveCard` など）              |
 | `features/boards/queries.ts`        | ボードの取得・作成・名前変更・削除のフック                           |
 | `features/boards/useBoardAction.ts` | ボードを変更するアクションを、楽観的更新つきで API に送るフック      |
+| `features/labels/queries.ts`        | ラベルの作成のフック（楽観的更新をしない）                           |
 
 ### すべての変更を楽観的更新にする
 
@@ -219,6 +229,33 @@ type NormalizedBoard = {
 
 - 追加したカードやカラムは、保存が終わって取り直すまでの短い間、画面で作った仮の ID を持つ。この間にそのカードを編集すると、サーバーにない ID なので 404 になる
 - 取得してから10秒たったデータは、画面にフォーカスが戻ったときなどに自動で取り直す。別のタブで削除されたカードは、そのときに画面から消える
+
+## ラベル（MVP の後に追加）
+
+ボードごとのラベルを作り、カードに付ける。仕様は [01-requirements.md](01-requirements.md#mvp-の後に追加した機能)、API は [03-api.md](03-api.md#ラベル)。
+
+### データの持ち方
+
+- カードは `labelIds`（ID の配列）だけを持ち、名前と色はボードの `labels` から `labelsOfCard` で引く。カードの並びの中にラベルの中身をコピーしないので、ラベルを消したときに直すのは `labels` とカードの `labelIds` だけで済む
+- 色は `green` のような名前で持ち、画面での見た目は `labelColors.ts` で決める。Tailwind CSS はソースに書かれたクラス名から CSS を作るので、`` `bg-${color}-100` `` のように組み立てず、クラス名をそのまま書く
+
+### 操作と、楽観的更新の例外
+
+| 操作                     | どう送るか                                                           | いつ反映するか             |
+| ------------------------ | -------------------------------------------------------------------- | -------------------------- |
+| カードにラベルを付け外す | `updateCard` アクションの `labelIds`（付けた後の ID をすべて）       | カード詳細の「保存」で     |
+| ラベルを削除する         | `deleteLabel` アクション（reducer が付けていたカードからも外す）     | すぐ（楽観的更新）         |
+| ラベルを作る             | `useCreateLabel`（`features/labels/queries.ts`）。アクションにしない | サーバーの応答が届いてから |
+
+ラベルの作成だけは、ほかの変更と違って楽観的更新をしない。作ったラベルはすぐカードに付けるので、ID が要る。楽観的更新では画面で作った仮の ID を使うので、そのままカードに付けて「保存」すると、サーバーにない ID を送って 400 になってしまう（上の「注意点」と同じ問題が、ここでは必ず起きる）。そこで、サーバーが決めた ID が返ってから `setQueryData` でキャッシュのボードに足し、作ったラベルをカードに付けた状態にする。
+
+### カード詳細の中のフォーム
+
+- `LabelPicker` はカード詳細の `<form>` の中にあり、`<form>` は入れ子にできない。そのため、新しいラベルの名前の Enter は `onKeyDown` で受け、`preventDefault()` で外側の form の送信（カードを保存して閉じる）を止めてから作る。日本語入力の変換確定の Enter（`isComposing`）では作らない
+- ラベルの付け外しはチェックボックス、色はラジオボタンにした。キーボード（Tab、Space、矢印キー）で操作でき、読み上げでも選んだ状態が伝わる。色のラジオボタンは `sr-only` で隠し、隣の色の丸に選んだ状態の枠を付ける
+- 「ラベルを作成」を押すと作成中はボタンが押せなくなり、フォーカスが外れてしまう。そこで押したときに名前の入力欄へフォーカスを戻し、続けて次のラベルを作れるようにしている
+- 編集中にラベルが削除されたときに備えて、保存するときはボードにまだあるラベルの ID だけを送る
+- カードの読み上げ名（`aria-label`）には、付いているラベルの名前も入れる（例：「カード「API を作る」（ラベル：急ぎ）」）。`aria-label` は中の文字より優先して読まれるため
 
 ## Step 6：ルーティングとテスト
 
@@ -252,12 +289,12 @@ type NormalizedBoard = {
 - 操作は `userEvent` で、クリックやキー入力を実際の順番どおりに起こす。日本語入力の変換中の Enter（`isComposing`）だけは `userEvent` で再現できないので `fireEvent` を使う
 - ページのテストは `test/renderApp.tsx` の `renderApp(path)` で描く。アプリと同じルート定義（`app/routes/index.tsx`）を `createMemoryRouter` で動かし、テストごとに新しい `QueryClient` を作る。保存の失敗を知らせる通知も確かめられるよう、`Toaster` も一緒に描く
 
-| ファイル                         | 確かめること                                                                                  |
-| -------------------------------- | --------------------------------------------------------------------------------------------- |
-| `routes.test.tsx`                | ボード一覧からの作成、カードの URL を直接開く、存在しない URL、一覧の取得に失敗したときの表示 |
-| `pages/BoardListPage.test.tsx`   | ボードがないときの表示、ボードの削除（確認とキャンセル）                                      |
-| `pages/BoardPage.test.tsx`       | ボード名・カラムの名前変更、カラムとカードの追加・削除、保存に失敗したときに元に戻すこと      |
-| `pages/CardDetailRoute.test.tsx` | カード詳細での保存・キャンセル・削除、タイトルが空のときは保存できないこと                    |
+| ファイル                         | 確かめること                                                                                             |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `routes.test.tsx`                | ボード一覧からの作成、カードの URL を直接開く、存在しない URL、一覧の取得に失敗したときの表示            |
+| `pages/BoardListPage.test.tsx`   | ボードがないときの表示、ボードの削除（確認とキャンセル）                                                 |
+| `pages/BoardPage.test.tsx`       | ボード名・カラムの名前変更、カラムとカードの追加・削除、保存に失敗したときに元に戻すこと                 |
+| `pages/CardDetailRoute.test.tsx` | カード詳細での保存・キャンセル・削除、タイトルが空のときは保存できないこと、ラベルの付け外し・作成・削除 |
 
 - 楽観的更新の途中（保存の結果が届く前）の画面を確かめるときは、`server.use` のハンドラーの中で Promise を待たせ、応答を止めておく。すぐに応答すると、確かめる前に結果が届いてしまう
 - 通知（sonner）は表示中の一覧を画面とは別に持ち、次に描いた `Toaster` がそれを引き継ぐ。前のテストの通知が残らないよう、`test/setup.ts` で各テストのあとに `toast.dismiss()` を呼ぶ
@@ -351,8 +388,8 @@ https://kiyohara1021.github.io/kanban-board/ で公開している。GitHub Page
 
 | ファイル                  | 役割                                                                                                                             |
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `src/demo/db.ts`          | バックエンドの3つのテーブルと同じ形のデータを `localStorage` に保存する。初回はサンプルを作る                                    |
-| `src/demo/api.ts`         | 14本のエンドポイントの処理。`backend/src/services/` と同じ規則で、検証と並び順は shared を使う                                   |
+| `src/demo/db.ts`          | バックエンドのテーブル（中間テーブルの `cardLabels` も含む）と同じ形のデータを `localStorage` に保存する。初回はサンプルを作る   |
+| `src/demo/api.ts`         | 16本のエンドポイントの処理。`backend/src/services/` と同じ規則で、検証と並び順は shared を使う                                   |
 | `src/demo/handlers.ts`    | MSW のハンドラー。URL と処理を結び付け、バックエンドと同じ形のレスポンスを返す（デモ版では150ms 待たせる）。画面のテストでも使う |
 | `src/demo/browser.ts`     | Service Worker を登録して、`/api` へのリクエストを受け取り始める                                                                 |
 | `src/demo/DemoBanner.tsx` | 「デモ版」の表示と、データを初期状態に戻すボタン                                                                                 |
@@ -361,6 +398,7 @@ https://kiyohara1021.github.io/kanban-board/ で公開している。GitHub Page
 - `DemoBanner` は `app/provider.tsx` が、デモ版のときだけ表示する
 - Service Worker のファイル（`mockServiceWorker.js`）は、`vite.config.ts` の `msw/vite` プラグイン（`worker-only` モード）がデモ版のビルドのときだけ出力する。リポジトリには入れない
 - データは訪れた人のブラウザに保存されるので、ほかの人のデータを壊すことはない
+- ラベルを足す前に保存されたデータには `labels` と `cardLabels` がない。`loadDb` で空の配列を補い、それまでのボードをそのまま使えるようにしている（`demo/db.test.ts`）
 
 ### GitHub Pages 特有の設定
 

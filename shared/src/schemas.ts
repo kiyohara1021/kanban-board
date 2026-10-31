@@ -5,6 +5,10 @@ export const BOARD_TITLE_MAX = 100
 export const COLUMN_TITLE_MAX = 50
 export const CARD_TITLE_MAX = 100
 export const CARD_DESCRIPTION_MAX = 2000
+export const LABEL_NAME_MAX = 30
+
+// ラベルの色。画面での見た目ではなく色の名前で保存する（docs/02-data-model.md）
+export const LABEL_COLORS = ['green', 'yellow', 'orange', 'red', 'purple', 'blue'] as const
 
 const title = (max: number) =>
   z
@@ -17,6 +21,8 @@ const description = z
   .string()
   .trim()
   .max(CARD_DESCRIPTION_MAX, `${CARD_DESCRIPTION_MAX}文字以内で入力してください`)
+
+const labelColor = z.enum(LABEL_COLORS, '決められた色から選んでください')
 
 const index = z.number().int('整数で指定してください').min(0, '0以上で指定してください')
 
@@ -36,10 +42,17 @@ export const createCardSchema = z.object({
 export const updateCardSchema = z.object({
   title: title(CARD_TITLE_MAX).optional(),
   description: description.optional(),
+  // 付けた後のラベルの ID をすべて送る（足す・外すの差分ではない）
+  labelIds: z.array(z.string().min(1)).optional(),
 })
 export const moveCardSchema = z.object({
   columnId: z.string().min(1, '移動先のカラムを指定してください'),
   index,
+})
+
+export const createLabelSchema = z.object({
+  name: title(LABEL_NAME_MAX),
+  color: labelColor,
 })
 
 export type CreateBoardInput = z.infer<typeof createBoardSchema>
@@ -50,6 +63,7 @@ export type MoveColumnInput = z.infer<typeof moveColumnSchema>
 export type CreateCardInput = z.infer<typeof createCardSchema>
 export type UpdateCardInput = z.infer<typeof updateCardSchema>
 export type MoveCardInput = z.infer<typeof moveCardSchema>
+export type CreateLabelInput = z.infer<typeof createLabelSchema>
 
 // ---- レスポンス ----
 // 日時は JSON では ISO 8601 の文字列になる
@@ -76,6 +90,16 @@ export const cardSchema = z.object({
   title: z.string(),
   description: z.string(),
   position: z.number(),
+  labelIds: z.array(z.string()),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+
+export const labelSchema = z.object({
+  id: z.string(),
+  boardId: z.string(),
+  name: z.string(),
+  color: labelColor,
   createdAt: z.string(),
   updatedAt: z.string(),
 })
@@ -83,11 +107,16 @@ export const cardSchema = z.object({
 export const columnWithCardsSchema = columnSchema.extend({ cards: z.array(cardSchema) })
 
 // GET /boards/:boardId のレスポンス
-export const boardDetailSchema = boardSchema.extend({ columns: z.array(columnWithCardsSchema) })
+export const boardDetailSchema = boardSchema.extend({
+  columns: z.array(columnWithCardsSchema),
+  labels: z.array(labelSchema),
+})
 
 export type Board = z.infer<typeof boardSchema>
 export type Column = z.infer<typeof columnSchema>
 export type Card = z.infer<typeof cardSchema>
+export type Label = z.infer<typeof labelSchema>
+export type LabelColor = (typeof LABEL_COLORS)[number]
 export type ColumnWithCards = z.infer<typeof columnWithCardsSchema>
 export type BoardDetail = z.infer<typeof boardDetailSchema>
 

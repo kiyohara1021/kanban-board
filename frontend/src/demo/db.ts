@@ -1,11 +1,29 @@
-import { POSITION_GAP, type Board, type Card, type Column } from '@kanban/shared'
+import {
+  POSITION_GAP,
+  type Board,
+  type Card,
+  type Column,
+  type Label,
+  type LabelColor,
+} from '@kanban/shared'
 
-// デモ版（GitHub Pages）の「DB」。バックエンドの3つのテーブルと同じ形で、ブラウザの localStorage に保存する。
+// DB に保存するカードの行。API で返す labelIds は持たず、中間テーブル（cardLabels）から作る
+export type CardRow = Omit<Card, 'labelIds'>
+// カードとラベルの中間テーブル（backend の CardLabel）の行
+export type CardLabelRow = { cardId: string; labelId: string }
+
+// デモ版（GitHub Pages）の「DB」。バックエンドのテーブルと同じ形で、ブラウザの localStorage に保存する。
 // 訪れた人ごとにブラウザの中にデータがあるので、ほかの人のデータを壊すことはない
 export type DemoDb = {
   boards: Board[]
   columns: Column[]
-  cards: Card[]
+  cards: CardRow[]
+  labels: Label[]
+  cardLabels: CardLabelRow[]
+}
+
+export function emptyDb(): DemoDb {
+  return { boards: [], columns: [], cards: [], labels: [], cardLabels: [] }
 }
 
 const STORAGE_KEY = 'kanban-board-demo:v1'
@@ -13,7 +31,8 @@ const STORAGE_KEY = 'kanban-board-demo:v1'
 export function loadDb(): DemoDb {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved) return JSON.parse(saved) as DemoDb
+    // ラベルを足す前に保存されたデータには labels と cardLabels がないので、空の配列で補う
+    if (saved) return { ...emptyDb(), ...(JSON.parse(saved) as Partial<DemoDb>) }
   } catch {
     // 保存できない環境（プライベートブラウズなど）や壊れたデータのときは、サンプルから始める
   }
@@ -37,17 +56,29 @@ export function resetDb() {
 }
 
 // backend/prisma/seed.ts と同じ内容のサンプル
-const sample: { title: string; cards: { title: string; description?: string }[] }[] = [
+const sampleLabels: { name: string; color: LabelColor }[] = [
+  { name: 'フロントエンド', color: 'blue' },
+  { name: 'バックエンド', color: 'green' },
+  { name: '設計', color: 'purple' },
+]
+
+// カードの labels には、上のラベルの名前を書く
+const sample: {
+  title: string
+  cards: { title: string; description?: string; labels?: string[] }[]
+}[] = [
   {
     title: 'ToDo',
     cards: [
       {
         title: 'TanStack Query で API とつなぐ',
         description: 'Step 5。useQuery でボードを取得する。',
+        labels: ['フロントエンド'],
       },
       {
         title: 'カード詳細を URL で開けるようにする',
         description: 'Step 6。React Router を使う。',
+        labels: ['フロントエンド', '設計'],
       },
     ],
   },
@@ -57,13 +88,14 @@ const sample: { title: string; cards: { title: string; description?: string }[] 
       {
         title: 'バックエンド API を作る',
         description: 'Step 4。docs/03-api.md のエンドポイントを実装する。',
+        labels: ['バックエンド'],
       },
     ],
   },
   {
     title: '完了',
     cards: [
-      { title: '固定データでボードを表示する' },
+      { title: '固定データでボードを表示する', labels: ['フロントエンド'] },
       { title: 'useReducer で追加・編集・削除' },
       { title: 'ドラッグ&ドロップで並び替え' },
     ],
@@ -78,7 +110,21 @@ export function createSampleDb(): DemoDb {
     createdAt: now,
     updatedAt: now,
   }
-  const db: DemoDb = { boards: [board], columns: [], cards: [] }
+  const db: DemoDb = { ...emptyDb(), boards: [board] }
+  sampleLabels.forEach((label) => {
+    db.labels.push({
+      id: crypto.randomUUID(),
+      boardId: board.id,
+      ...label,
+      createdAt: now,
+      updatedAt: now,
+    })
+  })
+  const labelIdOf = (name: string) => {
+    const label = db.labels.find((label) => label.name === name)
+    if (!label) throw new Error(`ラベル「${name}」が sampleLabels にありません`)
+    return label.id
+  }
 
   sample.forEach((column, i) => {
     const columnId = crypto.randomUUID()
@@ -91,8 +137,10 @@ export function createSampleDb(): DemoDb {
       updatedAt: now,
     })
     column.cards.forEach((card, j) => {
+      const cardId = crypto.randomUUID()
+      for (const name of card.labels ?? []) db.cardLabels.push({ cardId, labelId: labelIdOf(name) })
       db.cards.push({
-        id: crypto.randomUUID(),
+        id: cardId,
         columnId,
         title: card.title,
         description: card.description ?? '',

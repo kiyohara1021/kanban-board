@@ -2,6 +2,7 @@ import {
   createBoardSchema,
   createCardSchema,
   createColumnSchema,
+  createLabelSchema,
   moveCardSchema,
   moveColumnSchema,
   POSITION_GAP,
@@ -10,10 +11,11 @@ import {
   updateCardSchema,
   updateColumnSchema,
   type BoardDetail,
+  type Card,
   type ErrorResponse,
 } from '@kanban/shared'
 import type { z } from 'zod'
-import type { DemoDb } from './db'
+import type { CardRow, DemoDb } from './db'
 
 // デモ版の API の処理。backend/src/services と同じ規則で、DemoDb を読み書きする。
 // 入力の検証と並び順の計算には、バックエンドと同じ @kanban/shared の関数を使う
@@ -68,6 +70,25 @@ function findCard(db: DemoDb, cardId: string) {
   return card
 }
 
+function findLabel(db: DemoDb, labelId: string) {
+  const label = db.labels.find((label) => label.id === labelId)
+  if (!label) throw notFound('ラベル')
+  return label
+}
+
+// DB の行に、中間テーブルから集めたラベルの ID を足して、API の形にする（backend の toCard と同じ）
+function toCard(db: DemoDb, card: CardRow): Card {
+  const labelIds = db.cardLabels.filter((row) => row.cardId === card.id).map((row) => row.labelId)
+  return { ...card, labelIds }
+}
+
+// 消したカードやラベルにつながる中間テーブルの行も消す（DB のカスケード削除と同じ）
+function removeCards(db: DemoDb, isRemoved: (card: CardRow) => boolean) {
+  const removedIds = new Set(db.cards.filter(isRemoved).map((card) => card.id))
+  db.cardLabels = db.cardLabels.filter((row) => !removedIds.has(row.cardId))
+  db.cards = db.cards.filter((card) => !removedIds.has(card.id))
+}
+
 // ---- ボード ----
 
 // 新しいボードに最初から用意するカラム（backend/src/services/boardService.ts と同じ）
@@ -104,8 +125,13 @@ export function getBoardDetail(db: DemoDb, boardId: string): BoardDetail {
       .sort(byPosition)
       .map((column) => ({
         ...column,
-        cards: db.cards.filter((card) => card.columnId === column.id).sort(byPosition),
+        cards: db.cards
+          .filter((card) => card.columnId === column.id)
+          .sort(byPosition)
+          .map((card) => toCard(db, card)),
       })),
+    // 作った順に並べる。push した順がそのまま作った順になっている
+    labels: db.labels.filter((label) => label.boardId === boardId),
   }
 }
 
@@ -118,12 +144,13 @@ export function updateBoard(db: DemoDb, boardId: string, body: unknown) {
   return board
 }
 
-// 中のカラムとカードも消す（DB のカスケード削除と同じ）
+// 中のカラム・カード・ラベルも消す（DB のカスケード削除と同じ）
 export function deleteBoard(db: DemoDb, boardId: string) {
   findBoard(db, boardId)
   const columnIds = new Set(db.columns.filter((c) => c.boardId === boardId).map((c) => c.id))
-  db.cards = db.cards.filter((card) => !columnIds.has(card.columnId))
+  removeCards(db, (card) => columnIds.has(card.columnId))
   db.columns = db.columns.filter((column) => column.boardId !== boardId)
+  db.labels = db.labels.filter((label) => label.boardId !== boardId)
   db.boards = db.boards.filter((board) => board.id !== boardId)
 }
 
@@ -168,7 +195,7 @@ export function moveColumn(db: DemoDb, columnId: string, body: unknown) {
 
 export function deleteColumn(db: DemoDb, columnId: string) {
   findColumn(db, columnId)
-  db.cards = db.cards.filter((card) => card.columnId !== columnId)
+  removeCards(db, (card) => card.columnId === columnId)
   db.columns = db.columns.filter((column) => column.id !== columnId)
 }
 
@@ -189,20 +216,36 @@ export function createCard(db: DemoDb, columnId: string, body: unknown) {
     updatedAt: time,
   }
   db.cards.push(card)
-  return card
+  return toCard(db, card)
 }
 
 export function getCard(db: DemoDb, cardId: string) {
-  return findCard(db, cardId)
+  return toCard(db, findCard(db, cardId))
 }
 
 export function updateCard(db: DemoDb, cardId: string, body: unknown) {
   const input = parse(updateCardSchema, body)
   const card = findCard(db, cardId)
+
+  if (input.labelIds !== undefined) {
+    // 同じ ID は1つにまとめ、カードと同じボードのラベルだけを受け付ける
+    const uniqueIds = [...new Set(input.labelIds)]
+    const boardId = findColumn(db, card.columnId).boardId
+    const valid = uniqueIds.every((id) =>
+      db.labels.some((label) => label.id === id && label.boardId === boardId),
+    )
+    if (!valid)
+      throw invalid([{ path: 'labelIds', message: '同じボードのラベルを指定してください' }])
+    // 中間テーブルの行をいったんすべて消し、送られた組で作り直す
+    db.cardLabels = db.cardLabels
+      .filter((row) => row.cardId !== cardId)
+      .concat(uniqueIds.map((labelId) => ({ cardId, labelId })))
+  }
+
   if (input.title !== undefined) card.title = input.title
   if (input.description !== undefined) card.description = input.description
   card.updatedAt = now()
-  return card
+  return toCard(db, card)
 }
 
 export function moveCard(db: DemoDb, cardId: string, body: unknown) {
@@ -220,10 +263,35 @@ export function moveCard(db: DemoDb, cardId: string, body: unknown) {
   const { items, position } = positionForInsert(siblings, input.index)
   for (const item of items) findCard(db, item.id).position = item.position
   Object.assign(card, { columnId: toColumn.id, position, updatedAt: now() })
-  return card
+  return toCard(db, card)
 }
 
 export function deleteCard(db: DemoDb, cardId: string) {
   findCard(db, cardId)
-  db.cards = db.cards.filter((card) => card.id !== cardId)
+  removeCards(db, (card) => card.id === cardId)
+}
+
+// ---- ラベル ----
+
+export function createLabel(db: DemoDb, boardId: string, body: unknown) {
+  const input = parse(createLabelSchema, body)
+  findBoard(db, boardId)
+  const time = now()
+  const label = {
+    id: crypto.randomUUID(),
+    boardId,
+    name: input.name,
+    color: input.color,
+    createdAt: time,
+    updatedAt: time,
+  }
+  db.labels.push(label)
+  return label
+}
+
+// 付けていたカードからも外す（DB のカスケード削除と同じ）
+export function deleteLabel(db: DemoDb, labelId: string) {
+  findLabel(db, labelId)
+  db.cardLabels = db.cardLabels.filter((row) => row.labelId !== labelId)
+  db.labels = db.labels.filter((label) => label.id !== labelId)
 }

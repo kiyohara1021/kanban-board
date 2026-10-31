@@ -78,6 +78,7 @@ describe('boardReducer', () => {
         title: '新しいカード',
         description: '',
         position: 4000,
+        labelIds: [],
         createdAt: now,
         updatedAt: now,
       })
@@ -111,8 +112,21 @@ describe('boardReducer', () => {
       expect(findCard(next, 'card-1')).toMatchObject({
         title: 'useReducer でカードを追加できるようにする',
         description: '説明を変更',
+        labelIds: ['label-1', 'label-2'],
         updatedAt: now,
       })
+    })
+
+    it('labelIds を渡すと、付いているラベルを置き換える', () => {
+      const board = createBoard()
+      const next = boardReducer(board, {
+        type: 'updateCard',
+        cardId: 'card-1',
+        labelIds: ['label-2'],
+        now,
+      })
+
+      expect(findCard(next, 'card-1')?.labelIds).toEqual(['label-2'])
     })
 
     it('カードを含まないカラムは同じオブジェクトのまま残す', () => {
@@ -122,6 +136,19 @@ describe('boardReducer', () => {
       expect(next.columns[0]).not.toBe(board.columns[0])
       expect(next.columns[1]).toBe(board.columns[1])
       expect(next.columns[2]).toBe(board.columns[2])
+    })
+  })
+
+  describe('deleteLabel', () => {
+    it('ボードのラベル一覧から消し、付けていたカードからも外す', () => {
+      const board = createBoard()
+      const next = boardReducer(board, { type: 'deleteLabel', labelId: 'label-1' })
+
+      expect(next.labels.map((label) => label.id)).toEqual(['label-2'])
+      expect(findCard(next, 'card-1')?.labelIds).toEqual(['label-2'])
+      expect(findCard(next, 'card-2')?.labelIds).toEqual([])
+      // ラベルを付けたカードがないカラムは、同じオブジェクトのまま残す
+      expect(next.columns[1]).toBe(board.columns[1])
     })
   })
 

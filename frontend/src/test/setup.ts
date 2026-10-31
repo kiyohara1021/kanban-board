@@ -3,7 +3,7 @@ import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
 import { toast } from 'sonner'
 import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest'
-import { saveDb } from '@/demo/db'
+import { emptyDb, saveDb } from '@/demo/db'
 import { server } from './server'
 
 // テストの間だけ、/api へのリクエストを MSW が受け取る。
@@ -14,7 +14,7 @@ beforeAll(() => {
 
 // テストごとに DB を空にする。何も保存していないとサンプルが作られるので、空の DB を保存しておく
 beforeEach(() => {
-  saveDb({ boards: [], columns: [], cards: [] })
+  saveDb(emptyDb())
 })
 
 // テストごとに、描画した画面を片付ける（Vitest の globals を使っていないので、自分で登録する）。

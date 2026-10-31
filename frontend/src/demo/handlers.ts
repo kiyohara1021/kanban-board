@@ -111,4 +111,16 @@ export const handlers = [
       return {}
     }),
   ),
+
+  http.post(
+    '/api/boards/:boardId/labels',
+    route((db, p, body) => ({ status: 201, json: api.createLabel(db, p.boardId, body) })),
+  ),
+  http.delete(
+    '/api/labels/:labelId',
+    route((db, p) => {
+      api.deleteLabel(db, p.labelId)
+      return {}
+    }),
+  ),
 ]

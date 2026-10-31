@@ -1,12 +1,14 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
-import { loadDb } from '@/demo/db'
+import { loadDb, saveDb } from '@/demo/db'
 import { renderApp, saveSampleBoard } from '@/test/renderApp'
 
-// カード詳細の URL を直接開き、ダイアログが出るまで待つ
-async function openCard() {
+// カード詳細の URL を直接開き、ダイアログが出るまで待つ。
+// withLabel を true にすると、カードにラベル「急ぎ」を付けた状態から始める
+async function openCard({ withLabel = false } = {}) {
   saveSampleBoard()
+  if (withLabel) saveDb({ ...loadDb(), cardLabels: [{ cardId: 'k1', labelId: 'l1' }] })
   const user = userEvent.setup()
   const router = renderApp('/boards/b1/cards/k1')
   await screen.findByRole('dialog', { name: 'カードの編集' })
@@ -68,5 +70,79 @@ describe('カード詳細', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'カード「テストを書く」' })).not.toBeInTheDocument()
     await waitFor(() => expect(loadDb().cards).toEqual([]))
+  })
+})
+
+describe('カード詳細のラベル', () => {
+  it('ラベルを選んで保存すると、カードに表示される', async () => {
+    const { user } = await openCard()
+
+    const checkbox = screen.getByRole('checkbox', { name: '急ぎ' })
+    expect(checkbox).not.toBeChecked()
+    await user.click(checkbox)
+    await user.click(screen.getByRole('button', { name: '保存' }))
+
+    // カードの読み上げ名に、付いているラベルの名前も入る
+    expect(
+      screen.getByRole('button', { name: 'カード「テストを書く」（ラベル：急ぎ）' }),
+    ).toBeInTheDocument()
+    await waitFor(() => expect(loadDb().cardLabels).toEqual([{ cardId: 'k1', labelId: 'l1' }]))
+  })
+
+  it('チェックを外して保存すると、カードから外れる', async () => {
+    const { user } = await openCard({ withLabel: true })
+
+    const checkbox = screen.getByRole('checkbox', { name: '急ぎ' })
+    expect(checkbox).toBeChecked()
+    await user.click(checkbox)
+    await user.click(screen.getByRole('button', { name: '保存' }))
+
+    expect(screen.getByRole('button', { name: 'カード「テストを書く」' })).toBeInTheDocument()
+    await waitFor(() => expect(loadDb().cardLabels).toEqual([]))
+  })
+
+  it('ラベルを作ると、このカードに付けた状態で一覧に加わる', async () => {
+    const { user } = await openCard()
+
+    await user.type(screen.getByRole('textbox', { name: '新しいラベルの名前' }), '学習')
+    await user.click(screen.getByRole('radio', { name: '青' }))
+    await user.click(screen.getByRole('button', { name: 'ラベルを作成' }))
+
+    // サーバーが決めた ID が届いてから一覧に出る（楽観的更新はしない）
+    const checkbox = await screen.findByRole('checkbox', { name: '学習' })
+    // 一覧に出たあと（mutate に渡した onSuccess で）チェックが入る
+    await waitFor(() => expect(checkbox).toBeChecked())
+    expect(screen.getByRole('textbox', { name: '新しいラベルの名前' })).toHaveValue('')
+    const created = loadDb().labels.find((label) => label.name === '学習')
+    expect(created).toMatchObject({ boardId: 'b1', color: 'blue' })
+
+    await user.click(screen.getByRole('button', { name: '保存' }))
+    await waitFor(() =>
+      expect(loadDb().cardLabels).toEqual([{ cardId: 'k1', labelId: created?.id }]),
+    )
+  })
+
+  it('ラベルの名前で Enter を押すと、カードを保存せずにラベルだけ作る', async () => {
+    const { user } = await openCard()
+
+    await user.type(screen.getByRole('textbox', { name: '新しいラベルの名前' }), '学習{Enter}')
+
+    expect(await screen.findByRole('checkbox', { name: '学習' })).toBeInTheDocument()
+    // 外側の form が送信されていない（ダイアログが開いたまま）
+    expect(screen.getByRole('dialog', { name: 'カードの編集' })).toBeInTheDocument()
+  })
+
+  it('ラベルを削除すると、確認したあとで一覧と付けていたカードから消える', async () => {
+    const { user } = await openCard({ withLabel: true })
+
+    await user.click(screen.getByRole('button', { name: 'ラベル「急ぎ」を削除' }))
+    const confirm = screen.getByRole('alertdialog', { name: 'ラベル「急ぎ」を削除しますか？' })
+    await user.click(within(confirm).getByRole('button', { name: '削除' }))
+
+    expect(screen.queryByRole('checkbox', { name: '急ぎ' })).not.toBeInTheDocument()
+    expect(screen.getByText('ラベルはまだありません')).toBeInTheDocument()
+    // カードの保存を待たずに、すぐ削除される
+    await waitFor(() => expect(loadDb().labels).toEqual([]))
+    expect(loadDb().cardLabels).toEqual([])
   })
 })

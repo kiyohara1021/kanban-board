@@ -2,6 +2,7 @@ import { Navigate, useNavigate, useOutletContext, useParams } from 'react-router
 import { now } from '@/features/boards/actionValues'
 import { findCard } from '@/features/boards/boardReducer'
 import { CardDetailModal } from '@/features/cards/components/CardDetailModal'
+import { useCreateLabel } from '@/features/labels/queries'
 import type { BoardOutletContext } from './BoardPage'
 
 // /boards/:boardId/cards/:cardId（ボードの上に重ねるカード詳細）
@@ -10,6 +11,7 @@ export function CardDetailRoute() {
   // 親ルート（BoardPage）が取得したボードを受け取る。カードの情報はボードの詳細に含まれている
   const { board, run } = useOutletContext<BoardOutletContext>()
   const navigate = useNavigate()
+  const createLabel = useCreateLabel(board.id)
   const card = findCard(board, cardId)
   const boardPath = `/boards/${board.id}`
 
@@ -22,9 +24,14 @@ export function CardDetailRoute() {
     <CardDetailModal
       key={card.id}
       card={card}
+      labels={board.labels}
       onSave={(changes) => run({ type: 'updateCard', cardId: card.id, ...changes, now: now() })}
       onDelete={() => run({ type: 'deleteCard', cardId: card.id })}
       onClose={() => navigate(boardPath)}
+      // ラベルの作成と削除は、カードの「保存」を待たずにすぐ反映する（ボード全体のラベルなので）
+      onCreateLabel={(input, onCreated) => createLabel.mutate(input, { onSuccess: onCreated })}
+      isCreatingLabel={createLabel.isPending}
+      onDeleteLabel={(labelId) => run({ type: 'deleteLabel', labelId })}
     />
   )
 }

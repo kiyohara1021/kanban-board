@@ -1,18 +1,21 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import type { Card } from '@kanban/shared'
+import type { Card, Label } from '@kanban/shared'
 import type { DragData } from '@/features/boards/useBoardDnd'
+import { LabelChip } from '@/features/labels/components/LabelChip'
 import { cn } from '@/lib/utils'
 
 type Props = {
   card: Card
+  // このカードに付いているラベル
+  labels: Label[]
   onOpen: () => void
 }
 
 const cardClassName =
   'rounded-lg border border-slate-200 bg-white p-3 text-left shadow-sm select-none'
 
-export function CardItem({ card, onOpen }: Props) {
+export function CardItem({ card, labels, onOpen }: Props) {
   const {
     attributes,
     listeners,
@@ -45,7 +48,8 @@ export function CardItem({ card, onOpen }: Props) {
             onOpen()
           }
         }}
-        aria-label={`カード「${card.title}」`}
+        // aria-label は中の文字より優先して読まれるので、ラベルの名前もここに入れる
+        aria-label={cardName(card, labels)}
         className={cn(
           cardClassName,
           'cursor-grab hover:border-sky-300 focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:outline-none',
@@ -53,24 +57,48 @@ export function CardItem({ card, onOpen }: Props) {
           isDragging && 'opacity-40',
         )}
       >
-        <CardContent card={card} />
+        <CardContent card={card} labels={labels} />
       </div>
     </li>
   )
 }
 
 // ドラッグ中に指やマウスに付いていく表示（DragOverlay の中で使う）
-export function CardPreview({ card, className }: { card: Card; className?: string }) {
+export function CardPreview({
+  card,
+  labels,
+  className,
+}: {
+  card: Card
+  labels: Label[]
+  className?: string
+}) {
   return (
     <div className={cn(cardClassName, 'cursor-grabbing shadow-lg', className)}>
-      <CardContent card={card} />
+      <CardContent card={card} labels={labels} />
     </div>
   )
 }
 
-function CardContent({ card }: { card: Card }) {
+// 読み上げ用のカードの名前。例：カード「API を作る」（ラベル：急ぎ、バックエンド）
+function cardName(card: Card, labels: Label[]) {
+  const name = `カード「${card.title}」`
+  if (labels.length === 0) return name
+  return `${name}（ラベル：${labels.map((label) => label.name).join('、')}）`
+}
+
+function CardContent({ card, labels }: { card: Card; labels: Label[] }) {
   return (
     <>
+      {labels.length > 0 && (
+        <ul className="mb-1.5 flex flex-wrap gap-1">
+          {labels.map((label) => (
+            <li key={label.id} className="max-w-full">
+              <LabelChip label={label} />
+            </li>
+          ))}
+        </ul>
+      )}
       <p className="text-sm font-medium text-slate-800">{card.title}</p>
       {card.description !== '' && (
         <p className="mt-1 line-clamp-2 text-xs text-slate-500">{card.description}</p>

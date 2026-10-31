@@ -35,22 +35,24 @@
 
 ## エンドポイント一覧
 
-| メソッド | パス                       | 内容                               |
-| -------- | -------------------------- | ---------------------------------- |
-| GET      | `/boards`                  | ボード一覧                         |
-| POST     | `/boards`                  | ボード作成                         |
-| GET      | `/boards/:boardId`         | ボード詳細（カラムとカードを含む） |
-| PATCH    | `/boards/:boardId`         | ボード更新                         |
-| DELETE   | `/boards/:boardId`         | ボード削除                         |
-| POST     | `/boards/:boardId/columns` | カラム追加                         |
-| PATCH    | `/columns/:columnId`       | カラム更新                         |
-| POST     | `/columns/:columnId/move`  | カラムの並び替え                   |
-| DELETE   | `/columns/:columnId`       | カラム削除                         |
-| POST     | `/columns/:columnId/cards` | カード追加                         |
-| GET      | `/cards/:cardId`           | カード取得                         |
-| PATCH    | `/cards/:cardId`           | カード更新                         |
-| POST     | `/cards/:cardId/move`      | カードの並び替え・カラム間の移動   |
-| DELETE   | `/cards/:cardId`           | カード削除                         |
+| メソッド | パス                       | 内容                                       |
+| -------- | -------------------------- | ------------------------------------------ |
+| GET      | `/boards`                  | ボード一覧                                 |
+| POST     | `/boards`                  | ボード作成                                 |
+| GET      | `/boards/:boardId`         | ボード詳細（カラム・カード・ラベルを含む） |
+| PATCH    | `/boards/:boardId`         | ボード更新                                 |
+| DELETE   | `/boards/:boardId`         | ボード削除                                 |
+| POST     | `/boards/:boardId/columns` | カラム追加                                 |
+| PATCH    | `/columns/:columnId`       | カラム更新                                 |
+| POST     | `/columns/:columnId/move`  | カラムの並び替え                           |
+| DELETE   | `/columns/:columnId`       | カラム削除                                 |
+| POST     | `/columns/:columnId/cards` | カード追加                                 |
+| GET      | `/cards/:cardId`           | カード取得                                 |
+| PATCH    | `/cards/:cardId`           | カード更新                                 |
+| POST     | `/cards/:cardId/move`      | カードの並び替え・カラム間の移動           |
+| DELETE   | `/cards/:cardId`           | カード削除                                 |
+| POST     | `/boards/:boardId/labels`  | ラベル作成                                 |
+| DELETE   | `/labels/:labelId`         | ラベル削除                                 |
 
 親子関係のある作成（カラム追加、カード追加）は親の ID をパスに入れる。作成後の操作は、子の ID だけで指定できるようにする。
 
@@ -83,6 +85,18 @@ type Card = {
   title: string
   description: string
   position: number
+  labelIds: string[] // 付いているラベルの ID
+  createdAt: string
+  updatedAt: string
+}
+
+type LabelColor = 'green' | 'yellow' | 'orange' | 'red' | 'purple' | 'blue'
+
+type Label = {
+  id: string
+  boardId: string
+  name: string
+  color: LabelColor
   createdAt: string
   updatedAt: string
 }
@@ -90,8 +104,11 @@ type Card = {
 // GET /boards/:boardId のレスポンス
 type BoardDetail = Board & {
   columns: (Column & { cards: Card[] })[]
+  labels: Label[]
 }
 ```
+
+カードには、ラベルの中身ではなく ID の配列（`labelIds`）だけを入れる。ラベルの名前や色はボード詳細の `labels` に1回だけ入れ、画面では ID から引く。同じラベルを付けたカードが何枚あっても、名前や色を何度も送らずに済み、ラベルを消したときも `labels` から消すだけで済む。
 
 ---
 
@@ -120,7 +137,7 @@ type BoardDetail = Board & {
 
 ### GET /boards/:boardId
 
-ボード画面を1回のリクエストで描画できるよう、カラムとカードをまとめて返す。カラムとカードは `position` の昇順に並べる。
+ボード画面を1回のリクエストで描画できるよう、カラム・カード・ラベルをまとめて返す。カラムとカードは `position` の昇順、ラベルは作成した順に並べる。
 
 ```json
 // 200
@@ -144,10 +161,21 @@ type BoardDetail = Board & {
           "title": "React の公式チュートリアルを読む",
           "description": "",
           "position": 1000,
+          "labelIds": ["l1"],
           "createdAt": "...",
           "updatedAt": "..."
         }
       ]
+    }
+  ],
+  "labels": [
+    {
+      "id": "l1",
+      "boardId": "b1",
+      "name": "学習",
+      "color": "blue",
+      "createdAt": "...",
+      "updatedAt": "..."
     }
   ]
 }
@@ -164,7 +192,7 @@ type BoardDetail = Board & {
 
 ### DELETE /boards/:boardId
 
-204。配下のカラムとカードも削除する。
+204。配下のカラム・カード・ラベルも削除する。
 
 ---
 
@@ -229,11 +257,14 @@ type BoardDetail = Board & {
 ### PATCH /cards/:cardId
 
 ```json
-// リクエスト（どちらか一方だけでもよい）
-{ "title": "API を設計する", "description": "エンドポイント一覧を作る" }
+// リクエスト（どれか1つだけでもよい）
+{ "title": "API を設計する", "description": "エンドポイント一覧を作る", "labelIds": ["l1", "l2"] }
 
 // 200：更新後の Card
 ```
+
+- `labelIds` を送ると、カードに付いているラベルを、送った ID の組に置き換える（足したり外したりするのではなく、付けた後の状態を送る）。`[]` を送るとすべて外す。同じ ID が重なっていたら1つにまとめる
+- `labelIds` には、カードと同じボードのラベルだけを指定できる。ほかのボードのラベルや、存在しない ID が含まれていたら 400 を返す（`details` の `path` は `labelIds`）
 
 ### POST /cards/:cardId/move
 
@@ -254,3 +285,23 @@ type BoardDetail = Board & {
 ### DELETE /cards/:cardId
 
 204
+
+---
+
+## ラベル
+
+### POST /boards/:boardId/labels
+
+```json
+// リクエスト
+{ "name": "学習", "color": "blue" }
+
+// 201：作成した Label
+```
+
+- `color` は `green` / `yellow` / `orange` / `red` / `purple` / `blue` のどれか（[データモデル](02-data-model.md#項目ごとのルール)を参照）
+- 同じ名前のラベルを作ってもよい（色違いで同じ名前を使う場合もあるため）
+
+### DELETE /labels/:labelId
+
+204。付けていたカードからも外れる。

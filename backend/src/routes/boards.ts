@@ -1,4 +1,9 @@
-import { createBoardSchema, createColumnSchema, updateBoardSchema } from '@kanban/shared'
+import {
+  createBoardSchema,
+  createColumnSchema,
+  createLabelSchema,
+  updateBoardSchema,
+} from '@kanban/shared'
 import { Router } from 'express'
 import { parseBody } from '../lib/validate'
 import {
@@ -9,6 +14,7 @@ import {
   updateBoard,
 } from '../services/boardService'
 import { createColumn } from '../services/columnService'
+import { createLabel } from '../services/labelService'
 
 // routes は「URL とメソッド」「入力の検証」「ステータスコード」だけを担当し、DB の操作は services に任せる
 export const boardsRouter = Router()
@@ -39,4 +45,9 @@ boardsRouter.delete('/:boardId', async (req, res) => {
 boardsRouter.post('/:boardId/columns', async (req, res) => {
   const input = parseBody(createColumnSchema, req.body)
   res.status(201).json(await createColumn(req.params.boardId, input))
+})
+
+boardsRouter.post('/:boardId/labels', async (req, res) => {
+  const input = parseBody(createLabelSchema, req.body)
+  res.status(201).json(await createLabel(req.params.boardId, input))
 })

@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import * as api from './api'
-import { createSampleDb, type DemoDb } from './db'
+import { createSampleDb, emptyDb, type DemoDb } from './db'
 
 // デモ版の API が、backend/test/api.test.ts と同じ規則で動くことを確かめる
 let db: DemoDb
 
 beforeEach(() => {
-  db = { boards: [], columns: [], cards: [] }
+  db = emptyDb()
 })
 
 const titlesOf = (items: { title: string }[]) => items.map((item) => item.title)
@@ -21,12 +21,18 @@ function errorOf(action: () => unknown) {
 }
 
 describe('デモ版の API', () => {
-  it('サンプルのボードには、3カラムと6枚のカードがある', () => {
+  it('サンプルのボードには、3カラムと6枚のカードと3つのラベルがある', () => {
     const sample = createSampleDb()
     const detail = api.getBoardDetail(sample, sample.boards[0].id)
 
     expect(titlesOf(detail.columns)).toEqual(['ToDo', '進行中', '完了'])
     expect(detail.columns.flatMap((column) => column.cards)).toHaveLength(6)
+    expect(detail.labels.map((label) => label.name)).toEqual([
+      'フロントエンド',
+      'バックエンド',
+      '設計',
+    ])
+    expect(detail.columns[0].cards[1].labelIds).toHaveLength(2)
   })
 
   it('ボードを作ると、3つのカラムが用意される', () => {
@@ -90,13 +96,63 @@ describe('デモ版の API', () => {
     expect(titlesOf(api.getBoardDetail(db, board.id).columns)).toEqual(['完了', 'ToDo', '進行中'])
   })
 
-  it('ボードを削除すると、中のカラムとカードも消える', () => {
+  it('ボードを削除すると、中のカラム・カード・ラベルも消える', () => {
     const board = api.createBoard(db, { title: 'B' })
     const card = api.createCard(db, api.getBoardDetail(db, board.id).columns[0].id, { title: 'A' })
+    const label = api.createLabel(db, board.id, { name: '急ぎ', color: 'red' })
+    api.updateCard(db, card.id, { labelIds: [label.id] })
 
     api.deleteBoard(db, board.id)
 
-    expect(db).toEqual({ boards: [], columns: [], cards: [] })
+    expect(db).toEqual(emptyDb())
     expect(errorOf(() => api.getCard(db, card.id)).status).toBe(404)
+  })
+
+  it('ラベルを作り、カードに付ける。重なった ID は1つにまとめる', () => {
+    const board = api.createBoard(db, { title: 'B' })
+    const card = api.createCard(db, api.getBoardDetail(db, board.id).columns[0].id, { title: 'A' })
+    const label = api.createLabel(db, board.id, { name: '  急ぎ  ', color: 'red' })
+
+    const updated = api.updateCard(db, card.id, { labelIds: [label.id, label.id] })
+
+    expect(label).toMatchObject({ name: '急ぎ', color: 'red' })
+    expect(updated.labelIds).toEqual([label.id])
+    // labelIds を送らなければ変えない。移動しても外れない
+    api.updateCard(db, card.id, { title: 'B' })
+    const [, doing] = api.getBoardDetail(db, board.id).columns
+    expect(api.moveCard(db, card.id, { columnId: doing.id, index: 0 }).labelIds).toEqual([label.id])
+  })
+
+  it('ほかのボードのラベルは付けられない。決められた色以外では作れない', () => {
+    const board = api.createBoard(db, { title: 'B1' })
+    const other = api.createBoard(db, { title: 'B2' })
+    const card = api.createCard(db, api.getBoardDetail(db, board.id).columns[0].id, { title: 'A' })
+    const otherLabel = api.createLabel(db, other.id, { name: '急ぎ', color: 'red' })
+
+    expect(errorOf(() => api.updateCard(db, card.id, { labelIds: [otherLabel.id] }))).toMatchObject(
+      {
+        status: 400,
+        details: [{ path: 'labelIds', message: '同じボードのラベルを指定してください' }],
+      },
+    )
+    expect(
+      errorOf(() => api.createLabel(db, board.id, { name: '急ぎ', color: 'pink' })),
+    ).toMatchObject({
+      status: 400,
+      details: [{ path: 'color', message: '決められた色から選んでください' }],
+    })
+  })
+
+  it('ラベルを削除すると、付けていたカードからも外れる', () => {
+    const board = api.createBoard(db, { title: 'B' })
+    const card = api.createCard(db, api.getBoardDetail(db, board.id).columns[0].id, { title: 'A' })
+    const label = api.createLabel(db, board.id, { name: '急ぎ', color: 'red' })
+    api.updateCard(db, card.id, { labelIds: [label.id] })
+
+    api.deleteLabel(db, label.id)
+
+    expect(api.getBoardDetail(db, board.id).labels).toEqual([])
+    expect(api.getCard(db, card.id).labelIds).toEqual([])
+    expect(errorOf(() => api.deleteLabel(db, label.id)).status).toBe(404)
   })
 })

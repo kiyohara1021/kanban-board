@@ -54,6 +54,7 @@ npm run build:demo              # GitHub Pages 用のデモ版（確認は npm r
 - 描画中のエラーは、内側から順に `SectionErrorBoundary`（ページの一部）、ルートの `ErrorBoundary`（`app/routes/RouteErrorBoundary.tsx`）、`app/provider.tsx` の `ErrorBoundary`（アプリ全体）で受け止める。エラー画面は `components/ErrorFallback.tsx` を使う。取得の失敗はこれまでどおり `isError` を見てページの中で出す
 - エラー画面を変えたら、描画中に throw する一時的なコードでエラー画面と「再試行」「再読み込み」を確かめ、確かめたら消す
 - ボードを変更する操作は、すべて `features/boards/boardReducer.ts` のアクションとして表す。画面からは `useBoardAction` が返す `run(action)` を呼ぶ。これがキャッシュを reducer で先に書き換え（楽観的更新）、`sendAction` で API に送り、失敗したら元に戻す
+- 例外はラベルの作成だけ。作ったラベルの ID をすぐカードに付けるので、楽観的更新をせず、`features/labels/queries.ts` の `useCreateLabel` でサーバーの応答を待つ（仮の ID を送ると 400 になる）。同じように「作ったものの ID をすぐ使う」操作を足すときも、この形にする
 - reducer は純粋な関数に保つ。新しい ID と日時は `features/boards/actionValues.ts` の `newId()` / `now()` でイベントハンドラー側で作り、アクションに入れる
 - アクションの形は API（`docs/03-api.md`）と揃える。アクションを追加・変更したら、`sendAction` とそのテストも直す
 - ドラッグ中の見た目は `useBoardDnd` の仮のボード（`dragBoard`）で動かし、`run` を呼ぶのはドロップしたときの1回だけ

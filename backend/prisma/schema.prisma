@@ -12,6 +12,7 @@ model Board {
   id        String   @id @default(cuid())
   title     String
   columns   Column[]
+  labels    Label[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -30,14 +31,40 @@ model Column {
 }
 
 model Card {
-  id          String   @id @default(cuid())
+  id          String      @id @default(cuid())
   columnId    String
-  column      Column   @relation(fields: [columnId], references: [id], onDelete: Cascade)
+  column      Column      @relation(fields: [columnId], references: [id], onDelete: Cascade)
   title       String
-  description String   @default("")
+  description String      @default("")
   position    Float
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  labels      CardLabel[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 
   @@index([columnId, position])
+}
+
+model Label {
+  id        String      @id @default(cuid())
+  boardId   String
+  board     Board       @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  name      String
+  // green / yellow / orange / red / purple / blue のどれか。SQLite は enum を使えないので、Zod で確かめる
+  color     String
+  cards     CardLabel[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([boardId])
+}
+
+// カードとラベルの中間テーブル（多対多）。同じ組み合わせは1行だけ
+model CardLabel {
+  cardId  String
+  card    Card   @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  labelId String
+  label   Label  @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([cardId, labelId])
+  @@index([labelId])
 }

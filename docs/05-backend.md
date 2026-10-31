@@ -27,8 +27,8 @@ backend/
 │   ├── app.ts                Express アプリの組み立て（テストからも読み込む）
 │   ├── config.ts             環境変数の読み込みと初期値
 │   ├── errors.ts             HttpError / ValidationError / NotFoundError
-│   ├── routes/               URL ごとの処理（boards.ts, columns.ts, cards.ts）
-│   ├── services/             DB の操作（boardService.ts, columnService.ts, cardService.ts）
+│   ├── routes/               URL ごとの処理（boards.ts, columns.ts, cards.ts, labels.ts）
+│   ├── services/             DB の操作（boardService.ts, columnService.ts, cardService.ts, labelService.ts）
 │   ├── middlewares/
 │   │   └── errorHandler.ts   エラーを docs/03-api.md の JSON 形式に変換、404 の処理
 │   └── lib/
@@ -77,11 +77,18 @@ Express 5 は、async 関数の中で throw されたエラーを自動でエラ
 - 隙間が狭すぎて振り直したときは、同じカラム（またはボード）のほかの要素の position も保存する
 - カードの移動先は、移動元と同じボードのカラムに限る。違うボードのカラムや存在しないカラムを指定すると 400
 
+## ラベル
+
+- カードとラベルは中間テーブル `CardLabel` でつなぐ。カードを読むときは `cardService.ts` の `cardInclude` で中間テーブルからラベルの ID も読み、`toCard` で API の形（`labelIds: string[]`）に変える。カードを返すすべての処理（ボード詳細、カードの取得・作成・更新・移動）で、この2つを使う
+- `PATCH /cards/:cardId` で `labelIds` が送られたときは、中間テーブルの行をいったんすべて消し（`deleteMany: {}`）、送られた組で作り直す。足す・外すの差分を計算するより簡単で、結果も同じになる
+- 付けるラベルがカードと同じボードのものかを確かめてから書き込むので、`prisma.$transaction` で囲む。同じボードのラベルを `count` で数え、送られた ID の数（重なりを除いたもの）と合わなければ 400
+- ラベルやカードを削除したときの中間テーブルの行は、スキーマの `onDelete: Cascade` で DB が消す
+
 ## shared パッケージ（@kanban/shared）
 
 ```
 shared/src/
-├── schemas.ts    Zod スキーマと、z.infer で作った型（Board, Column, Card, BoardDetail, 各リクエストの入力）
+├── schemas.ts    Zod スキーマと、z.infer で作った型（Board, Column, Card, Label, BoardDetail, 各リクエストの入力）、ラベルの色の一覧
 ├── position.ts   並び順の計算（positionForInsert）
 └── index.ts
 ```

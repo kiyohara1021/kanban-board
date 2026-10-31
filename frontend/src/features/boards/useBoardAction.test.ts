@@ -45,6 +45,11 @@ describe('sendAction', () => {
       { type: 'deleteCard', cardId: 'k1' },
       { url: '/api/cards/k1', method: 'DELETE' },
     ],
+    [
+      'ラベルの削除',
+      { type: 'deleteLabel', labelId: 'l1' },
+      { url: '/api/labels/l1', method: 'DELETE' },
+    ],
   ])('%s', async (_name, action, expected) => {
     expect(await requestOf(action)).toEqual({ body: undefined, ...expected })
   })
@@ -52,5 +57,15 @@ describe('sendAction', () => {
   it('カードの更新では、送られた項目だけをボディに入れる', async () => {
     const request = await requestOf({ type: 'updateCard', cardId: 'k1', title: '新', now })
     expect(request).toEqual({ url: '/api/cards/k1', method: 'PATCH', body: { title: '新' } })
+  })
+
+  it('カードのラベルを変えるときは、付けた後の ID をすべて送る', async () => {
+    const request = await requestOf({
+      type: 'updateCard',
+      cardId: 'k1',
+      labelIds: ['l1', 'l2'],
+      now,
+    })
+    expect(request.body).toEqual({ labelIds: ['l1', 'l2'] })
   })
 })

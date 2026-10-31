@@ -1,9 +1,9 @@
-import type { Board, Card, Column } from '@kanban/shared'
+import type { Board, Column, Label } from '@kanban/shared'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { Toaster } from 'sonner'
-import { saveDb } from '@/demo/db'
+import { emptyDb, saveDb, type CardRow } from '@/demo/db'
 import { routes } from '@/app/routes'
 
 // 画面のテストで共通に使うデータと描画の手順
@@ -18,7 +18,8 @@ export const column: Column = {
   createdAt: time,
   updatedAt: time,
 }
-export const card: Card = {
+// DB の行なので labelIds は持たない。付いているラベルは cardLabels で表す
+export const card: CardRow = {
   id: 'k1',
   columnId: 'c1',
   title: 'テストを書く',
@@ -27,11 +28,20 @@ export const card: Card = {
   createdAt: time,
   updatedAt: time,
 }
+export const label: Label = {
+  id: 'l1',
+  boardId: 'b1',
+  name: '急ぎ',
+  color: 'red',
+  createdAt: time,
+  updatedAt: time,
+}
 
 // API は MSW（src/test/server.ts）が受ける。DB は各テストの前に空になるので、
-// 必要なデータをテストの最初に保存しておく。DB はバックエンドと同じく、テーブルごとの平らな配列
+// 必要なデータをテストの最初に保存しておく。DB はバックエンドと同じく、テーブルごとの平らな配列。
+// ラベルはボードにあるだけで、カードには付いていない
 export function saveSampleBoard() {
-  saveDb({ boards: [board], columns: [column], cards: [card] })
+  saveDb({ ...emptyDb(), boards: [board], columns: [column], cards: [card], labels: [label] })
 }
 
 // アプリと同じルート定義を、ブラウザの URL ではなくメモリ上の URL で動かす。

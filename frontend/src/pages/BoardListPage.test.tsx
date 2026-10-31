@@ -1,7 +1,7 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
-import { loadDb } from '@/demo/db'
+import { emptyDb, loadDb } from '@/demo/db'
 import { renderApp, saveSampleBoard } from '@/test/renderApp'
 
 describe('ボード一覧', () => {
@@ -26,8 +26,8 @@ describe('ボード一覧', () => {
     expect(
       await screen.findByText('ボードがありません。最初のボードを作りましょう。'),
     ).toBeInTheDocument()
-    // ボードの中のカラムとカードも消える
-    expect(loadDb()).toEqual({ boards: [], columns: [], cards: [] })
+    // ボードの中のカラム・カード・ラベルも消える
+    expect(loadDb()).toEqual(emptyDb())
   })
 
   it('削除の確認でキャンセルすると、何も消さない', async () => {

@@ -1,4 +1,4 @@
-import type { BoardDetail, Card, Column } from '@kanban/shared'
+import type { BoardDetail, Card, Column, Label } from '@kanban/shared'
 import request from 'supertest'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { app } from '../src/app'
@@ -29,6 +29,11 @@ async function getBoard(boardId: string): Promise<BoardDetail> {
 
 async function addCard(columnId: string, title: string): Promise<Card> {
   const res = await api.post(`/api/columns/${columnId}/cards`).send({ title }).expect(201)
+  return res.body
+}
+
+async function addLabel(boardId: string, name: string, color = 'blue'): Promise<Label> {
+  const res = await api.post(`/api/boards/${boardId}/labels`).send({ name, color }).expect(201)
   return res.body
 }
 
@@ -157,7 +162,7 @@ describe('カード', () => {
     const first = await addCard(board.columns[0].id, '1枚目')
     const second = await addCard(board.columns[0].id, '2枚目')
 
-    expect(first).toMatchObject({ title: '1枚目', description: '', position: 1000 })
+    expect(first).toMatchObject({ title: '1枚目', description: '', position: 1000, labelIds: [] })
     expect(second.position).toBe(2000)
   })
 
@@ -255,5 +260,121 @@ describe('カード', () => {
       .expect(400)
 
     expect(res.body.error.details[0].path).toBe('index')
+  })
+})
+
+// ---- ラベル ----
+
+describe('ラベル', () => {
+  it('作成すると、ボード詳細に作った順で入る', async () => {
+    const board = await createBoard()
+
+    const label = await addLabel(board.id, '  急ぎ  ', 'red')
+    await addLabel(board.id, '後で', 'green')
+
+    expect(label).toMatchObject({ boardId: board.id, name: '急ぎ', color: 'red' })
+    const after = await getBoard(board.id)
+    expect(after.labels.map((l) => l.name)).toEqual(['急ぎ', '後で'])
+  })
+
+  it('決められた色以外は 400 を返す', async () => {
+    const board = await createBoard()
+
+    const res = await api
+      .post(`/api/boards/${board.id}/labels`)
+      .send({ name: '急ぎ', color: 'pink' })
+      .expect(400)
+
+    expect(res.body.error.details[0]).toEqual({
+      path: 'color',
+      message: '決められた色から選んでください',
+    })
+  })
+
+  it('存在しないボードには作れない', async () => {
+    await api.post('/api/boards/unknown/labels').send({ name: '急ぎ', color: 'red' }).expect(404)
+  })
+
+  it('カードに付けると、送った ID の組に置き換わる', async () => {
+    const board = await createBoard()
+    const card = await addCard(board.columns[0].id, 'A')
+    const urgent = await addLabel(board.id, '急ぎ')
+    const later = await addLabel(board.id, '後で')
+
+    await api
+      .patch(`/api/cards/${card.id}`)
+      .send({ labelIds: [urgent.id, later.id] })
+      .expect(200)
+    // 重なった ID は1つにまとめる
+    const res = await api
+      .patch(`/api/cards/${card.id}`)
+      .send({ labelIds: [later.id, later.id] })
+      .expect(200)
+
+    expect(res.body.labelIds).toEqual([later.id])
+    expect((await getBoard(board.id)).columns[0].cards[0].labelIds).toEqual([later.id])
+  })
+
+  it('labelIds を送らなければ、付いているラベルは変えない', async () => {
+    const board = await createBoard()
+    const card = await addCard(board.columns[0].id, 'A')
+    const label = await addLabel(board.id, '急ぎ')
+    await api
+      .patch(`/api/cards/${card.id}`)
+      .send({ labelIds: [label.id] })
+      .expect(200)
+
+    const res = await api.patch(`/api/cards/${card.id}`).send({ title: 'B' }).expect(200)
+
+    expect(res.body).toMatchObject({ title: 'B', labelIds: [label.id] })
+  })
+
+  it('移動しても、付いているラベルはそのまま', async () => {
+    const board = await createBoard()
+    const card = await addCard(board.columns[0].id, 'A')
+    const label = await addLabel(board.id, '急ぎ')
+    await api
+      .patch(`/api/cards/${card.id}`)
+      .send({ labelIds: [label.id] })
+      .expect(200)
+
+    const res = await api
+      .post(`/api/cards/${card.id}/move`)
+      .send({ columnId: board.columns[1].id, index: 0 })
+      .expect(200)
+
+    expect(res.body.labelIds).toEqual([label.id])
+  })
+
+  it('ほかのボードのラベルや、存在しないラベルは付けられない', async () => {
+    const board = await createBoard('ボード1')
+    const other = await createBoard('ボード2')
+    const card = await addCard(board.columns[0].id, 'A')
+    const otherLabel = await addLabel(other.id, '急ぎ')
+
+    for (const labelIds of [[otherLabel.id], ['unknown']]) {
+      const res = await api.patch(`/api/cards/${card.id}`).send({ labelIds }).expect(400)
+      expect(res.body.error.details).toEqual([
+        { path: 'labelIds', message: '同じボードのラベルを指定してください' },
+      ])
+    }
+    expect((await getBoard(board.id)).columns[0].cards[0].labelIds).toEqual([])
+  })
+
+  it('削除すると、付けていたカードからも外れる', async () => {
+    const board = await createBoard()
+    const card = await addCard(board.columns[0].id, 'A')
+    const label = await addLabel(board.id, '急ぎ')
+    await api
+      .patch(`/api/cards/${card.id}`)
+      .send({ labelIds: [label.id] })
+      .expect(200)
+
+    await api.delete(`/api/labels/${label.id}`).expect(204)
+
+    const after = await getBoard(board.id)
+    expect(after.labels).toEqual([])
+    expect(after.columns[0].cards[0].labelIds).toEqual([])
+    await api.delete(`/api/labels/${label.id}`).expect(404)
   })
 })

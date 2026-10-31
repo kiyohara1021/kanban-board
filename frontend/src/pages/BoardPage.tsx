@@ -13,6 +13,7 @@ import { useBoardAction } from '@/features/boards/useBoardAction'
 import { useBoardDnd } from '@/features/boards/useBoardDnd'
 import { CardPreview } from '@/features/cards/components/CardItem'
 import { BoardColumn, ColumnPreview } from '@/features/columns/components/BoardColumn'
+import { labelsOfCard } from '@/features/labels/labelColors'
 import { ApiError } from '@/lib/apiClient'
 
 // 子ルート（カード詳細）に渡す値。子では useOutletContext で受け取る
@@ -80,6 +81,7 @@ function BoardColumns({ board, run }: { board: BoardDetail; run: (action: BoardA
             <BoardColumn
               key={column.id}
               column={column}
+              labels={shownBoard.labels}
               onRename={(title) =>
                 run({ type: 'renameColumn', columnId: column.id, title, now: now() })
               }
@@ -104,8 +106,14 @@ function BoardColumns({ board, run }: { board: BoardDetail; run: (action: BoardA
 
       {/* ドラッグ中、マウスや指に付いていく表示。元の要素とは別に、画面の一番上に描画される */}
       <DragOverlay>
-        {activeCard && <CardPreview card={activeCard} className="rotate-2" />}
-        {activeColumn && <ColumnPreview column={activeColumn} />}
+        {activeCard && (
+          <CardPreview
+            card={activeCard}
+            labels={labelsOfCard(shownBoard.labels, activeCard)}
+            className="rotate-2"
+          />
+        )}
+        {activeColumn && <ColumnPreview column={activeColumn} labels={shownBoard.labels} />}
       </DragOverlay>
     </DndContext>
   )
