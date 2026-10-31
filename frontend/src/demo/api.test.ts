@@ -1,3 +1,4 @@
+import { isOverdue, toDateString } from '@kanban/shared'
 import { beforeEach, describe, expect, it } from 'vitest'
 import * as api from './api'
 import { createSampleDb, emptyDb, type DemoDb } from './db'
@@ -33,6 +34,11 @@ describe('デモ版の API', () => {
       '設計',
     ])
     expect(detail.columns[0].cards[1].labelIds).toHaveLength(2)
+    // 期限日は作った日を基準にするので、期限切れのカードとまだ先のカードが必ずある
+    const today = toDateString(new Date())
+    const dueDates = detail.columns.flatMap((column) => column.cards).map((card) => card.dueDate)
+    expect(dueDates.filter((dueDate) => isOverdue(dueDate, today))).toHaveLength(1)
+    expect(dueDates.filter((dueDate) => dueDate !== null && dueDate > today)).toHaveLength(2)
   })
 
   it('ボードを作ると、3つのカラムが用意される', () => {
@@ -154,5 +160,19 @@ describe('デモ版の API', () => {
     expect(api.getBoardDetail(db, board.id).labels).toEqual([])
     expect(api.getCard(db, card.id).labelIds).toEqual([])
     expect(errorOf(() => api.deleteLabel(db, label.id)).status).toBe(404)
+  })
+
+  it('期限日を設定・消去する。送らなければ変えず、存在しない日付は 400 を返す', () => {
+    const board = api.createBoard(db, { title: 'B' })
+    const card = api.createCard(db, api.getBoardDetail(db, board.id).columns[0].id, { title: 'A' })
+    expect(card.dueDate).toBeNull()
+
+    expect(api.updateCard(db, card.id, { dueDate: '2026-11-05' }).dueDate).toBe('2026-11-05')
+    expect(api.updateCard(db, card.id, { title: 'B' }).dueDate).toBe('2026-11-05')
+    expect(errorOf(() => api.updateCard(db, card.id, { dueDate: '2026-02-30' }))).toMatchObject({
+      status: 400,
+      details: [{ path: 'dueDate', message: 'YYYY-MM-DD の形の、実在する日付で指定してください' }],
+    })
+    expect(api.updateCard(db, card.id, { dueDate: null }).dueDate).toBeNull()
   })
 })

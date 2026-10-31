@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import {
@@ -25,7 +25,12 @@ type Props = {
   card: Card
   // ボードのラベル一覧
   labels: BoardLabel[]
-  onSave: (changes: { title: string; description: string; labelIds: string[] }) => void
+  onSave: (changes: {
+    title: string
+    description: string
+    labelIds: string[]
+    dueDate: string | null
+  }) => void
   onDelete: () => void
   onClose: () => void
   onCreateLabel: (input: CreateLabelInput, onCreated: (label: BoardLabel) => void) => void
@@ -48,10 +53,15 @@ export function CardDetailModal({
   const [title, setTitle] = useState(card.title)
   const [description, setDescription] = useState(card.description)
   const [labelIds, setLabelIds] = useState(card.labelIds)
+  // <input type="date"> の値は "2026-11-05" の形の文字列で、未入力は空文字。API の null とは保存するときに変える
+  const [dueDate, setDueDate] = useState(card.dueDate ?? '')
   const trimmedTitle = title.trim()
   // label と入力欄をつなぐ id。画面に同じ部品が複数あっても重ならない値を React が作る
   const titleId = useId()
   const descriptionId = useId()
+  const dueDateId = useId()
+  // 「期限日を消す」を押すとボタンが押せなくなるので、フォーカスを日付の入力欄に移す
+  const dueDateRef = useRef<HTMLInputElement>(null)
 
   return (
     <Dialog
@@ -77,6 +87,7 @@ export function CardDetailModal({
               description: description.trim(),
               // 編集中に削除されたラベルは送らない（サーバーにない ID を送ると 400 になる）
               labelIds: labelIds.filter((id) => labels.some((label) => label.id === id)),
+              dueDate: dueDate === '' ? null : dueDate,
             })
             onClose()
           }}
@@ -100,6 +111,30 @@ export function CardDetailModal({
               maxLength={CARD_DESCRIPTION_MAX}
               rows={6}
             />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor={dueDateId}>期限日</Label>
+            <div className="flex gap-2">
+              <Input
+                ref={dueDateRef}
+                id={dueDateId}
+                type="date"
+                value={dueDate}
+                onChange={(event) => setDueDate(event.target.value)}
+                className="w-auto"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                disabled={dueDate === ''}
+                onClick={() => {
+                  setDueDate('')
+                  dueDateRef.current?.focus()
+                }}
+              >
+                期限日を消す
+              </Button>
+            </div>
           </div>
           <LabelPicker
             labels={labels}

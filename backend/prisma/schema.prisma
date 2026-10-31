@@ -37,6 +37,8 @@ model Card {
   title       String
   description String      @default("")
   position    Float
+  // 期限日。"2026-11-05" のような日付だけの文字列。未設定は null（docs/02-data-model.md）
+  dueDate     String?
   labels      CardLabel[]
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt

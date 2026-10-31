@@ -2,8 +2,8 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
-import { loadDb } from '@/demo/db'
-import { renderApp, saveSampleBoard } from '@/test/renderApp'
+import { loadDb, saveDb } from '@/demo/db'
+import { renderApp, saveSampleBoard, setToday } from '@/test/renderApp'
 import { server } from '@/test/server'
 
 // サーバーのエラー（500）を返すハンドラーの中身。server.use でこのテストの間だけ差し込む
@@ -111,6 +111,34 @@ describe('カード', () => {
 
     expect(await screen.findByRole('dialog', { name: 'カードの編集' })).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'タイトル' })).toHaveValue('テストを書く')
+  })
+
+  it('期限日を過ぎたカードは「期限切れ」と表示し、期限日が今日のカードは期限切れにしない', async () => {
+    setToday(2026, 11, 5)
+    saveSampleBoard()
+    const db = loadDb()
+    const card = db.cards[0]!
+    saveDb({
+      ...db,
+      cards: [
+        { ...card, dueDate: '2026-11-04' },
+        { ...card, id: 'k2', title: '今日まで', position: 2000, dueDate: '2026-11-05' },
+        { ...card, id: 'k3', title: '来年', position: 3000, dueDate: '2027-01-10' },
+      ],
+    })
+    renderApp('/boards/b1')
+
+    // 色だけでなく、文字と読み上げ名でも期限切れが分かる
+    const overdue = await screen.findByRole('button', {
+      name: 'カード「テストを書く」（期限：11月4日、期限切れ）',
+    })
+    expect(within(overdue).getByText('期限切れ')).toBeInTheDocument()
+    const dueToday = screen.getByRole('button', { name: 'カード「今日まで」（期限：11月5日）' })
+    expect(within(dueToday).queryByText('期限切れ')).not.toBeInTheDocument()
+    // 今年でない日付には年も付ける
+    expect(
+      screen.getByRole('button', { name: 'カード「来年」（期限：2027年1月10日）' }),
+    ).toBeInTheDocument()
   })
 
   it('保存に失敗したら、画面を元に戻してエラーを知らせる', async () => {

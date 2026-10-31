@@ -212,6 +212,8 @@ export function createCard(db: DemoDb, columnId: string, body: unknown) {
     title: input.title,
     description: input.description,
     position: positionForInsert(siblings, siblings.length).position,
+    // 期限日は作ったあとにカード詳細で設定する（docs/03-api.md）
+    dueDate: null,
     createdAt: time,
     updatedAt: time,
   }
@@ -244,6 +246,8 @@ export function updateCard(db: DemoDb, cardId: string, body: unknown) {
 
   if (input.title !== undefined) card.title = input.title
   if (input.description !== undefined) card.description = input.description
+  // null は「期限日を消す」なので、undefined（送られていない）とだけ区別する
+  if (input.dueDate !== undefined) card.dueDate = input.dueDate
   card.updatedAt = now()
   return toCard(db, card)
 }

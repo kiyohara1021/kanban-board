@@ -1,5 +1,6 @@
 import {
   POSITION_GAP,
+  toDateString,
   type Board,
   type Card,
   type Column,
@@ -31,8 +32,12 @@ const STORAGE_KEY = 'kanban-board-demo:v1'
 export function loadDb(): DemoDb {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
-    // ラベルを足す前に保存されたデータには labels と cardLabels がないので、空の配列で補う
-    if (saved) return { ...emptyDb(), ...(JSON.parse(saved) as Partial<DemoDb>) }
+    if (saved) {
+      // ラベルを足す前に保存されたデータには labels と cardLabels がないので、空の配列で補う
+      const db = { ...emptyDb(), ...(JSON.parse(saved) as Partial<DemoDb>) }
+      // 期限日を足す前に保存されたカードには dueDate がないので、null（未設定）で補う
+      return { ...db, cards: db.cards.map((card) => ({ ...card, dueDate: card.dueDate ?? null })) }
+    }
   } catch {
     // 保存できない環境（プライベートブラウズなど）や壊れたデータのときは、サンプルから始める
   }
@@ -62,10 +67,18 @@ const sampleLabels: { name: string; color: LabelColor }[] = [
   { name: '設計', color: 'purple' },
 ]
 
+// 今日から days 日後（負の数なら前）の日付。期限日を固定の日付にすると、いつかすべて期限切れになるので、
+// サンプルを作った日を基準にして「期限切れ」と「まだ先」のカードが必ずできるようにする
+function daysFromToday(days: number) {
+  const date = new Date()
+  date.setDate(date.getDate() + days)
+  return toDateString(date)
+}
+
 // カードの labels には、上のラベルの名前を書く
 const sample: {
   title: string
-  cards: { title: string; description?: string; labels?: string[] }[]
+  cards: { title: string; description?: string; labels?: string[]; dueDate?: string }[]
 }[] = [
   {
     title: 'ToDo',
@@ -74,11 +87,13 @@ const sample: {
         title: 'TanStack Query で API とつなぐ',
         description: 'Step 5。useQuery でボードを取得する。',
         labels: ['フロントエンド'],
+        dueDate: daysFromToday(3),
       },
       {
         title: 'カード詳細を URL で開けるようにする',
         description: 'Step 6。React Router を使う。',
         labels: ['フロントエンド', '設計'],
+        dueDate: daysFromToday(10),
       },
     ],
   },
@@ -89,6 +104,7 @@ const sample: {
         title: 'バックエンド API を作る',
         description: 'Step 4。docs/03-api.md のエンドポイントを実装する。',
         labels: ['バックエンド'],
+        dueDate: daysFromToday(-2),
       },
     ],
   },
@@ -145,6 +161,7 @@ export function createSampleDb(): DemoDb {
         title: card.title,
         description: card.description ?? '',
         position: (j + 1) * POSITION_GAP,
+        dueDate: card.dueDate ?? null,
         createdAt: now,
         updatedAt: now,
       })

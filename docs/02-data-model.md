@@ -30,6 +30,7 @@ erDiagram
     string title
     string description
     float position
+    string dueDate "null 可"
     datetime createdAt
     datetime updatedAt
   }
@@ -54,14 +55,15 @@ erDiagram
 
 ## 項目ごとのルール
 
-| モデル | 項目        | ルール                              |
-| ------ | ----------- | ----------------------------------- |
-| Board  | title       | 必須、1〜100文字                    |
-| Column | title       | 必須、1〜50文字                     |
-| Card   | title       | 必須、1〜100文字                    |
-| Card   | description | 任意、0〜2000文字（未入力は空文字） |
-| Label  | name        | 必須、1〜30文字                     |
-| Label  | color       | 必須、下の6色のどれか               |
+| モデル | 項目        | ルール                                                 |
+| ------ | ----------- | ------------------------------------------------------ |
+| Board  | title       | 必須、1〜100文字                                       |
+| Column | title       | 必須、1〜50文字                                        |
+| Card   | title       | 必須、1〜100文字                                       |
+| Card   | description | 任意、0〜2000文字（未入力は空文字）                    |
+| Card   | dueDate     | 任意、`YYYY-MM-DD` 形式の実在する日付（未設定は null） |
+| Label  | name        | 必須、1〜30文字                                        |
+| Label  | color       | 必須、下の6色のどれか                                  |
 
 ラベルの色は、画面での見た目（Tailwind CSS のクラス）ではなく、`green` のような色の名前で保存する。見た目を変えても DB を書き換えずに済む。
 
@@ -75,6 +77,16 @@ erDiagram
 | `blue`   | 青           |
 
 ID は cuid（推測されにくい文字列）で、サーバー側で生成する。
+
+## 期限日（dueDate）の持ち方
+
+期限日は時刻を持たない「日付だけ」の値なので、`DateTime` ではなく `"2026-11-05"` のような文字列（`String?`）で持つ。
+
+- **タイムゾーンで1日ずれない**：`DateTime` で持つと、日本時間の「11月5日 0時」は UTC では「11月4日 15時」になる。どの時刻を入れるか、どのタイムゾーンで日付に戻すかを毎回考える必要があり、間違えると表示が1日ずれる。文字列なら、入力した日付がそのまま保存され、そのまま返る
+- **API・画面と同じ形**：`<input type="date">` の値も `"2026-11-05"` の形なので、変換せずにそのまま送れる
+- **文字列のまま比べられる**：`YYYY-MM-DD` は桁数がそろっているので、文字列の大小と日付の前後が一致する。「期限切れか」は `dueDate < 今日` で判定できる
+- SQLite には日付だけを表す型がないので、DB の中では文字列で持つことになる。形式（`YYYY-MM-DD` で、2月30日のような存在しない日付ではないこと）は Zod のスキーマ（`shared/src/schemas.ts`）で確かめる
+- 期限日を設定しないカードもあるので、null を許す。空文字ではなく null にして、「設定していない」ことをはっきり表す
 
 ## 並び順（position）の持ち方
 
@@ -127,6 +139,8 @@ model Card {
   title       String
   description String      @default("")
   position    Float
+  // 期限日。"2026-11-05" のような日付だけの文字列。未設定は null
+  dueDate     String?
   labels      CardLabel[]
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
@@ -165,5 +179,4 @@ model CardLabel {
 
 ## 今後の拡張（MVP の後）
 
-- `Card.dueDate`（期限日、null 可）
 - `User` テーブルと、`Board.ownerId`

@@ -26,6 +26,7 @@ export function sendAction(boardId: string, action: BoardAction): Promise<unknow
         title: action.title,
         description: action.description,
         labelIds: action.labelIds,
+        dueDate: action.dueDate,
       })
     case 'deleteCard':
       return deleteCard(action.cardId)

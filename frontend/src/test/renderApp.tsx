@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { Toaster } from 'sonner'
+import { vi } from 'vitest'
 import { emptyDb, saveDb, type CardRow } from '@/demo/db'
 import { routes } from '@/app/routes'
 
@@ -25,6 +26,7 @@ export const card: CardRow = {
   title: 'テストを書く',
   description: 'React Testing Library を使う',
   position: 1000,
+  dueDate: null,
   createdAt: time,
   updatedAt: time,
 }
@@ -42,6 +44,15 @@ export const label: Label = {
 // ラベルはボードにあるだけで、カードには付いていない
 export function saveSampleBoard() {
   saveDb({ ...emptyDb(), boards: [board], columns: [column], cards: [card], labels: [label] })
+}
+
+// 期限切れかどうかは「今日」で変わるので、テストの中の今日を決める。
+// Date だけを偽物にし、setTimeout などは本物のままにするので、userEvent や findBy の待ち合わせはそのまま動く。
+// 本物の Date には test/setup.ts がテストごとに戻す
+export function setToday(year: number, month: number, day: number) {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  // 月は0始まり。昼の12時にしておき、タイムゾーンの違いで日付が変わらないようにする
+  vi.setSystemTime(new Date(year, month - 1, day, 12))
 }
 
 // アプリと同じルート定義を、ブラウザの URL ではなくメモリ上の URL で動かす。

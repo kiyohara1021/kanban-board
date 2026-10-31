@@ -12,4 +12,19 @@ describe('デモ版の DB', () => {
 
     expect(loadDb()).toEqual({ ...emptyDb(), boards: [board] })
   })
+
+  it('期限日を足す前に保存されたカードも、期限日が未設定（null）の状態で読み込める', () => {
+    const card = {
+      id: 'k1',
+      columnId: 'c1',
+      title: 'A',
+      description: '',
+      position: 1000,
+      createdAt: '',
+      updatedAt: '',
+    }
+    localStorage.setItem('kanban-board-demo:v1', JSON.stringify({ ...emptyDb(), cards: [card] }))
+
+    expect(loadDb().cards).toEqual([{ ...card, dueDate: null }])
+  })
 })

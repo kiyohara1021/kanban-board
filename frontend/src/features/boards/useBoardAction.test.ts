@@ -68,4 +68,13 @@ describe('sendAction', () => {
     })
     expect(request.body).toEqual({ labelIds: ['l1', 'l2'] })
   })
+
+  it('期限日は日付の文字列で送り、消すときは null を送る', async () => {
+    const set = await requestOf({ type: 'updateCard', cardId: 'k1', dueDate: '2026-11-05', now })
+    expect(set.body).toEqual({ dueDate: '2026-11-05' })
+
+    // undefined の項目は JSON に入らないが、null は入る。null で「消す」ことをサーバーに伝えられる
+    const cleared = await requestOf({ type: 'updateCard', cardId: 'k1', dueDate: null, now })
+    expect(cleared.body).toEqual({ dueDate: null })
+  })
 })

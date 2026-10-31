@@ -46,6 +46,7 @@ npm run build:demo              # GitHub Pages 用のデモ版（確認は npm r
 
 - リクエストの検証ルール、型、文字数制限は `shared/src/schemas.ts` だけに書く。フロントとバックで別々に定義しない
 - 並び順は小数の `position` で持ち、計算は必ず `shared/src/position.ts` の `positionForInsert` を使う。`index` は「移動する要素自身を除いた並び」で数える
+- 期限日のような時刻を持たない日付は、`"2026-11-05"` の文字列のまま扱い、`Date` や `DateTime` に変えない（タイムゾーンで1日ずれるため）。今日の日付は `shared/src/dueDate.ts` の `toDateString` で作る（コンポーネントの中では `features/cards/useToday.ts` の `useToday()` を使い、描画の中で `new Date()` を呼ばない）。判定する関数には今日の日付を引数で渡す
 
 ### フロントエンド
 

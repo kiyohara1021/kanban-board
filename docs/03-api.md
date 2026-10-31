@@ -5,6 +5,7 @@
 - ベース URL：`http://localhost:3000/api`
 - リクエストとレスポンスは JSON
 - 日時は ISO 8601 形式の文字列（例：`"2026-10-30T09:00:00.000Z"`）
+- 時刻を持たない日付（カードの期限日）は `YYYY-MM-DD` 形式の文字列（例：`"2026-11-05"`）。タイムゾーンで日付がずれないよう、日時には変換しない（[データモデル](02-data-model.md#期限日duedateの持ち方)を参照）
 - `PATCH` は部分更新。送った項目だけを変更する
 - リクエストボディは、フロントとバックで共有する Zod スキーマで検証する
 
@@ -86,6 +87,7 @@ type Card = {
   description: string
   position: number
   labelIds: string[] // 付いているラベルの ID
+  dueDate: string | null // 期限日（"2026-11-05" の形）。未設定は null
   createdAt: string
   updatedAt: string
 }
@@ -162,6 +164,7 @@ type BoardDetail = Board & {
           "description": "",
           "position": 1000,
           "labelIds": ["l1"],
+          "dueDate": "2026-11-05",
           "createdAt": "...",
           "updatedAt": "..."
         }
@@ -248,7 +251,7 @@ type BoardDetail = Board & {
 // 201：作成した Card
 ```
 
-`description` は省略でき、省略した場合は空文字になる。
+`description` は省略でき、省略した場合は空文字になる。作ったカードの `dueDate` は `null`（期限日は `PATCH /cards/:cardId` で設定する）。
 
 ### GET /cards/:cardId
 
@@ -258,13 +261,20 @@ type BoardDetail = Board & {
 
 ```json
 // リクエスト（どれか1つだけでもよい）
-{ "title": "API を設計する", "description": "エンドポイント一覧を作る", "labelIds": ["l1", "l2"] }
+{
+  "title": "API を設計する",
+  "description": "エンドポイント一覧を作る",
+  "labelIds": ["l1", "l2"],
+  "dueDate": "2026-11-05"
+}
 
 // 200：更新後の Card
 ```
 
 - `labelIds` を送ると、カードに付いているラベルを、送った ID の組に置き換える（足したり外したりするのではなく、付けた後の状態を送る）。`[]` を送るとすべて外す。同じ ID が重なっていたら1つにまとめる
 - `labelIds` には、カードと同じボードのラベルだけを指定できる。ほかのボードのラベルや、存在しない ID が含まれていたら 400 を返す（`details` の `path` は `labelIds`）
+- `dueDate` は `"2026-11-05"` のような `YYYY-MM-DD` 形式の日付か、`null`。`null` を送ると期限日を消す。形式が違うときや、`"2026-02-30"` のような存在しない日付のときは 400 を返す（`details` の `path` は `dueDate`）
+- 過去の日付も指定できる（期限を過ぎたカードの期限日を、あとから記録し直すこともあるため）
 
 ### POST /cards/:cardId/move
 

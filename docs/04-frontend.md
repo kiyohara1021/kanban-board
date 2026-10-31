@@ -35,6 +35,8 @@ frontend/src/
 │   │   └── components/       BoardColumn, ColumnHeader
 │   ├── cards/
 │   │   ├── api.ts
+│   │   ├── dueDate.ts        期限日を「11月5日」の形にする formatDueDate
+│   │   ├── useToday.ts       今日の日付を返すフック（日付が変わったら描画し直す）
 │   │   └── components/       CardItem, CardDetailModal
 │   └── labels/
 │       ├── api.ts            createLabel, deleteLabel
@@ -96,13 +98,13 @@ BoardPage                   ボードの取得。読み込み中・取得のエ�
     │           │   └── BoardColumn × n カラム自体も並び替えられる
     │           │       ├── ColumnHeader    ドラッグ用の取っ手、タイトルのインライン編集、削除ボタン（ConfirmDialog）
     │           │       ├── SortableContext カードの並び（縦方向）。id はカラムの ID
-    │           │       │   └── CardItem × n  ラベル（LabelChip）とタイトル。クリックか Enter で CardDetailModal を開く
+    │           │       │   └── CardItem × n  ラベル（LabelChip）、タイトル、期限日。クリックか Enter で CardDetailModal を開く
     │           │       └── AddItemForm     カードの追加
     │           ├── AddItemForm         カラムの追加
     │           └── DragOverlay         ドラッグ中に指やマウスに付いていく表示（CardPreview / ColumnPreview）
     └── <Outlet />          子ルート。URL に /cards/:cardId があるときだけ CardDetailRoute → CardDetailModal
 
-CardDetailModal             タイトル・説明・ラベルの選択を state に持ち、「保存」でまとめて run する
+CardDetailModal             タイトル・説明・期限日・ラベルの選択を state に持ち、「保存」でまとめて run する
 ├── LabelPicker             ラベルのチェックボックス、削除ボタン（ConfirmDialog）、新しいラベルの名前と色
 └── ConfirmDialog           カードの削除
 ```
@@ -257,6 +259,34 @@ type NormalizedBoard = {
 - 編集中にラベルが削除されたときに備えて、保存するときはボードにまだあるラベルの ID だけを送る
 - カードの読み上げ名（`aria-label`）には、付いているラベルの名前も入れる（例：「カード「API を作る」（ラベル：急ぎ）」）。`aria-label` は中の文字より優先して読まれるため
 
+## 期限日（MVP の後に追加）
+
+カードに期限日を付け、期限を過ぎたカードを目立たせる。仕様は [01-requirements.md](01-requirements.md#期限日)、データの持ち方は [02-data-model.md](02-data-model.md#期限日duedateの持ち方)。
+
+### 日付の扱い
+
+- 期限日は `"2026-11-05"` のような日付だけの文字列のまま扱い、`Date` に変えない。`new Date("2026-11-05")` は UTC の0時として読まれるので、日本より西のタイムゾーンでは前の日になってしまう。表示用の「11月5日」も、文字列を `-` で分けて作る（`features/cards/dueDate.ts` の `formatDueDate`）
+- 今日の日付は、`@kanban/shared` の `toDateString(new Date())` で、見ている人のタイムゾーンでの `"YYYY-MM-DD"` にする。`toISOString()` は UTC の日付になるので使わない
+- 期限切れの判定（`@kanban/shared` の `isOverdue(dueDate, today)`）は、今日の日付を引数で受け取る純粋な関数にした。いつ実行しても同じ結果になるので、テストで「今日」を決められる。判定は `dueDate < today` の文字列の比較だけで、期限日が今日のカードは期限切れにしない
+- `CardItem` は今日の日付を `features/cards/useToday.ts` の `useToday()` で読む。描画の中で `new Date()` を呼ぶと、同じ props でも呼んだ時刻によって結果が変わり、コンポーネントが純粋でなくなる（oxlint の `react(purity)` も警告する）。「今の日付」は React の外にある値なので、`useSyncExternalStore` で読む。1分ごとに確かめ、日付が変わったときだけ描画し直すので、ページを開いたまま日付が変わっても期限切れの表示が切り替わる
+
+### 操作
+
+| 操作                   | アクション                                            | 反映するタイミング     |
+| ---------------------- | ----------------------------------------------------- | ---------------------- |
+| 期限日を設定・変更する | `updateCard` アクションの `dueDate`（`"2026-11-05"`） | カード詳細の「保存」で |
+| 期限日を消す           | `updateCard` アクションの `dueDate: null`             | カード詳細の「保存」で |
+
+- `dueDate` は「省略（`undefined`）なら変えない、`null` なら消す」と区別する。reducer では `??` を使うと `null` も「変えない」になってしまうので、`undefined` かどうかで分けている。`JSON.stringify` は `undefined` の項目を省き、`null` は残すので、`sendAction` ではそのまま API に渡せる
+- カード詳細の入力欄は `<input type="date">`。値は API と同じ `"YYYY-MM-DD"` の文字列で、未入力は空文字なので、保存するときに空文字を `null` に変える。ブラウザの日付の入力欄を使うと、カレンダーからも選べ、キーボード（矢印キーで年・月・日を増減）でも入力できる
+- 「期限日を消す」ボタンは、期限日がないときは押せない。押すとボタンが押せなくなってフォーカスが外れてしまうので、日付の入力欄にフォーカスを移す
+
+### 期限切れの見せ方
+
+- 色だけに頼らない。期限切れのカードは枠と期限日を赤くし、加えて警告のアイコンと「期限切れ」の文字を出す。期限切れでない期限日は、カレンダーのアイコンと灰色の文字で出す
+- カードの読み上げ名にも期限日を入れる（例：「カード「API を作る」（期限：11月4日、期限切れ）」）
+- 期限日は `<time dateTime="2026-11-05">` で囲み、機械が読める形の日付も残す
+
 ## Step 6：ルーティングとテスト
 
 ### ルート
@@ -289,15 +319,16 @@ type NormalizedBoard = {
 - 操作は `userEvent` で、クリックやキー入力を実際の順番どおりに起こす。日本語入力の変換中の Enter（`isComposing`）だけは `userEvent` で再現できないので `fireEvent` を使う
 - ページのテストは `test/renderApp.tsx` の `renderApp(path)` で描く。アプリと同じルート定義（`app/routes/index.tsx`）を `createMemoryRouter` で動かし、テストごとに新しい `QueryClient` を作る。保存の失敗を知らせる通知も確かめられるよう、`Toaster` も一緒に描く
 
-| ファイル                         | 確かめること                                                                                             |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `routes.test.tsx`                | ボード一覧からの作成、カードの URL を直接開く、存在しない URL、一覧の取得に失敗したときの表示            |
-| `pages/BoardListPage.test.tsx`   | ボードがないときの表示、ボードの削除（確認とキャンセル）                                                 |
-| `pages/BoardPage.test.tsx`       | ボード名・カラムの名前変更、カラムとカードの追加・削除、保存に失敗したときに元に戻すこと                 |
-| `pages/CardDetailRoute.test.tsx` | カード詳細での保存・キャンセル・削除、タイトルが空のときは保存できないこと、ラベルの付け外し・作成・削除 |
+| ファイル                         | 確かめること                                                                                                                 |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `routes.test.tsx`                | ボード一覧からの作成、カードの URL を直接開く、存在しない URL、一覧の取得に失敗したときの表示                                |
+| `pages/BoardListPage.test.tsx`   | ボードがないときの表示、ボードの削除（確認とキャンセル）                                                                     |
+| `pages/BoardPage.test.tsx`       | ボード名・カラムの名前変更、カラムとカードの追加・削除、保存に失敗したときに元に戻すこと、期限切れの表示                     |
+| `pages/CardDetailRoute.test.tsx` | カード詳細での保存・キャンセル・削除、タイトルが空のときは保存できないこと、ラベルの付け外し・作成・削除、期限日の設定と消去 |
 
 - 楽観的更新の途中（保存の結果が届く前）の画面を確かめるときは、`server.use` のハンドラーの中で Promise を待たせ、応答を止めておく。すぐに応答すると、確かめる前に結果が届いてしまう
 - 通知（sonner）は表示中の一覧を画面とは別に持ち、次に描いた `Toaster` がそれを引き継ぐ。前のテストの通知が残らないよう、`test/setup.ts` で各テストのあとに `toast.dismiss()` を呼ぶ
+- 期限切れの表示は「今日」で変わるので、`test/renderApp.tsx` の `setToday(2026, 11, 5)` でテストの中の今日を決める。`vi.useFakeTimers({ toFake: ['Date'] })` で `Date` だけを偽物にし、`setTimeout` などは本物のまま残すので、`userEvent` や `findBy` の待ち合わせはそのまま動く。`test/setup.ts` が各テストのあとに `vi.useRealTimers()` で戻す
 
 ### API を MSW で受ける
 
@@ -399,6 +430,8 @@ https://kiyohara1021.github.io/kanban-board/ で公開している。GitHub Page
 - Service Worker のファイル（`mockServiceWorker.js`）は、`vite.config.ts` の `msw/vite` プラグイン（`worker-only` モード）がデモ版のビルドのときだけ出力する。リポジトリには入れない
 - データは訪れた人のブラウザに保存されるので、ほかの人のデータを壊すことはない
 - ラベルを足す前に保存されたデータには `labels` と `cardLabels` がない。`loadDb` で空の配列を補い、それまでのボードをそのまま使えるようにしている（`demo/db.test.ts`）
+- 同じように、期限日を足す前に保存されたカードには `dueDate` がないので、`loadDb` で `null`（未設定）を補う
+- サンプルの期限日は、サンプルを作った日を基準にする（2日前、3日後、10日後）。固定の日付にすると、いつかすべて期限切れになってしまうため。`backend/prisma/seed.ts` も同じにしている
 
 ### GitHub Pages 特有の設定
 

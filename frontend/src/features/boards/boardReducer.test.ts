@@ -79,6 +79,7 @@ describe('boardReducer', () => {
         description: '',
         position: 4000,
         labelIds: [],
+        dueDate: null,
         createdAt: now,
         updatedAt: now,
       })
@@ -113,8 +114,28 @@ describe('boardReducer', () => {
         title: 'useReducer でカードを追加できるようにする',
         description: '説明を変更',
         labelIds: ['label-1', 'label-2'],
+        dueDate: '2026-11-05',
         updatedAt: now,
       })
+    })
+
+    it('dueDate を渡すと期限日を変え、null を渡すと消す', () => {
+      const board = createBoard()
+      const changed = boardReducer(board, {
+        type: 'updateCard',
+        cardId: 'card-1',
+        dueDate: '2026-12-24',
+        now,
+      })
+      expect(findCard(changed, 'card-1')?.dueDate).toBe('2026-12-24')
+
+      const cleared = boardReducer(board, {
+        type: 'updateCard',
+        cardId: 'card-1',
+        dueDate: null,
+        now,
+      })
+      expect(findCard(cleared, 'card-1')?.dueDate).toBeNull()
     })
 
     it('labelIds を渡すと、付いているラベルを置き換える', () => {

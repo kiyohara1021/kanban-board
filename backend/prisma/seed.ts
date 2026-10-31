@@ -1,6 +1,6 @@
 // 動作確認用のサンプルデータ。何度実行しても同じ状態になるよう、既存のデータを消してから作る
 import 'dotenv/config'
-import { POSITION_GAP, type LabelColor } from '@kanban/shared'
+import { POSITION_GAP, toDateString, type LabelColor } from '@kanban/shared'
 import { prisma } from '../src/lib/prisma'
 
 const labels: { name: string; color: LabelColor }[] = [
@@ -9,10 +9,18 @@ const labels: { name: string; color: LabelColor }[] = [
   { name: '設計', color: 'purple' },
 ]
 
+// 今日から days 日後（負の数なら前）の日付。期限日を固定の日付にすると、いつかすべて期限切れになるので、
+// 実行した日を基準にして「期限切れ」と「まだ先」のカードが必ずできるようにする
+function daysFromToday(days: number) {
+  const date = new Date()
+  date.setDate(date.getDate() + days)
+  return toDateString(date)
+}
+
 // カードの labels には、上のラベルの名前を書く
 const columns: {
   title: string
-  cards: { title: string; description?: string; labels?: string[] }[]
+  cards: { title: string; description?: string; labels?: string[]; dueDate?: string }[]
 }[] = [
   {
     title: 'ToDo',
@@ -21,11 +29,13 @@ const columns: {
         title: 'TanStack Query で API とつなぐ',
         description: 'Step 5。useQuery でボードを取得する。',
         labels: ['フロントエンド'],
+        dueDate: daysFromToday(3),
       },
       {
         title: 'カード詳細を URL で開けるようにする',
         description: 'Step 6。React Router を使う。',
         labels: ['フロントエンド', '設計'],
+        dueDate: daysFromToday(10),
       },
     ],
   },
@@ -36,6 +46,7 @@ const columns: {
         title: 'バックエンド API を作る',
         description: 'Step 4。docs/03-api.md のエンドポイントを実装する。',
         labels: ['バックエンド'],
+        dueDate: daysFromToday(-2),
       },
     ],
   },
@@ -75,6 +86,7 @@ async function main() {
             title: card.title,
             description: card.description ?? '',
             position: (j + 1) * POSITION_GAP,
+            dueDate: card.dueDate ?? null,
             // 中間テーブル（CardLabel）の行を、カードと一緒に作る
             labels: {
               create: (card.labels ?? []).map((name) => ({ labelId: labelIdOf(name) })),

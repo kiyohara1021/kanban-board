@@ -24,6 +24,10 @@ const description = z
 
 const labelColor = z.enum(LABEL_COLORS, '決められた色から選んでください')
 
+// 期限日は時刻を持たない日付だけの値なので、"2026-11-05" の形の文字列で扱う（docs/02-data-model.md）。
+// z.iso.date() は形だけでなく、2月30日のような存在しない日付も弾く
+const dueDate = z.iso.date('YYYY-MM-DD の形の、実在する日付で指定してください')
+
 const index = z.number().int('整数で指定してください').min(0, '0以上で指定してください')
 
 // ---- リクエストボディ（docs/03-api.md） ----
@@ -44,6 +48,8 @@ export const updateCardSchema = z.object({
   description: description.optional(),
   // 付けた後のラベルの ID をすべて送る（足す・外すの差分ではない）
   labelIds: z.array(z.string().min(1)).optional(),
+  // null を送ると期限日を消す。省略したときは変えない
+  dueDate: dueDate.nullable().optional(),
 })
 export const moveCardSchema = z.object({
   columnId: z.string().min(1, '移動先のカラムを指定してください'),
@@ -91,6 +97,7 @@ export const cardSchema = z.object({
   description: z.string(),
   position: z.number(),
   labelIds: z.array(z.string()),
+  dueDate: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 })

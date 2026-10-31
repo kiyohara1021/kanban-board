@@ -162,7 +162,13 @@ describe('カード', () => {
     const first = await addCard(board.columns[0].id, '1枚目')
     const second = await addCard(board.columns[0].id, '2枚目')
 
-    expect(first).toMatchObject({ title: '1枚目', description: '', position: 1000, labelIds: [] })
+    expect(first).toMatchObject({
+      title: '1枚目',
+      description: '',
+      position: 1000,
+      labelIds: [],
+      dueDate: null,
+    })
     expect(second.position).toBe(2000)
   })
 
@@ -376,5 +382,58 @@ describe('ラベル', () => {
     expect(after.labels).toEqual([])
     expect(after.columns[0].cards[0].labelIds).toEqual([])
     await api.delete(`/api/labels/${label.id}`).expect(404)
+  })
+})
+
+// ---- 期限日 ----
+
+describe('期限日', () => {
+  it('日付の文字列で設定でき、そのままの日付で返る', async () => {
+    const board = await createBoard()
+    const card = await addCard(board.columns[0].id, 'A')
+
+    const res = await api.patch(`/api/cards/${card.id}`).send({ dueDate: '2026-11-05' }).expect(200)
+
+    expect(res.body.dueDate).toBe('2026-11-05')
+    // タイムゾーンで1日ずれず、ボード詳細でも同じ日付になる
+    expect((await getBoard(board.id)).columns[0].cards[0].dueDate).toBe('2026-11-05')
+  })
+
+  it('null を送ると消え、送らなければ変えない', async () => {
+    const board = await createBoard()
+    const card = await addCard(board.columns[0].id, 'A')
+    await api.patch(`/api/cards/${card.id}`).send({ dueDate: '2026-11-05' }).expect(200)
+
+    const kept = await api.patch(`/api/cards/${card.id}`).send({ title: 'B' }).expect(200)
+    expect(kept.body).toMatchObject({ title: 'B', dueDate: '2026-11-05' })
+
+    const cleared = await api.patch(`/api/cards/${card.id}`).send({ dueDate: null }).expect(200)
+    expect(cleared.body.dueDate).toBeNull()
+  })
+
+  it('移動しても、期限日はそのまま', async () => {
+    const board = await createBoard()
+    const card = await addCard(board.columns[0].id, 'A')
+    await api.patch(`/api/cards/${card.id}`).send({ dueDate: '2026-11-05' }).expect(200)
+
+    const res = await api
+      .post(`/api/cards/${card.id}/move`)
+      .send({ columnId: board.columns[1].id, index: 0 })
+      .expect(200)
+
+    expect(res.body.dueDate).toBe('2026-11-05')
+  })
+
+  it('形が違う日付や、存在しない日付は 400 を返す', async () => {
+    const board = await createBoard()
+    const card = await addCard(board.columns[0].id, 'A')
+
+    for (const dueDate of ['2026/11/05', '2026-11-5', '2026-02-30', '2026-11-05T00:00:00Z', '']) {
+      const res = await api.patch(`/api/cards/${card.id}`).send({ dueDate }).expect(400)
+      expect(res.body.error.details).toEqual([
+        { path: 'dueDate', message: 'YYYY-MM-DD の形の、実在する日付で指定してください' },
+      ])
+    }
+    expect((await getBoard(board.id)).columns[0].cards[0].dueDate).toBeNull()
   })
 })

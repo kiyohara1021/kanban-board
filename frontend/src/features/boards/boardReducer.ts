@@ -20,6 +20,8 @@ export type BoardAction =
       description?: string
       // 付けた後のラベルの ID をすべて入れる（PATCH /cards/:cardId と同じ）
       labelIds?: string[]
+      // 期限日（"2026-11-05" の形）。null は「期限日を消す」、省略は「変えない」（PATCH /cards/:cardId と同じ）
+      dueDate?: string | null
       now: string
     }
   | { type: 'deleteCard'; cardId: string }
@@ -89,6 +91,7 @@ export function boardReducer(board: BoardDetail, action: BoardAction): BoardDeta
             description: '',
             position: nextPosition(column.cards),
             labelIds: [],
+            dueDate: null,
             createdAt: action.now,
             updatedAt: action.now,
           }
@@ -106,6 +109,8 @@ export function boardReducer(board: BoardDetail, action: BoardAction): BoardDeta
                 title: action.title ?? card.title,
                 description: action.description ?? card.description,
                 labelIds: action.labelIds ?? card.labelIds,
+                // null（消す）も値として使うので ?? ではなく undefined かどうかで分ける
+                dueDate: action.dueDate !== undefined ? action.dueDate : card.dueDate,
                 updatedAt: action.now,
               }
             : card,

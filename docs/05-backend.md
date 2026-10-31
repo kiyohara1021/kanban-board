@@ -84,12 +84,20 @@ Express 5 は、async 関数の中で throw されたエラーを自動でエラ
 - 付けるラベルがカードと同じボードのものかを確かめてから書き込むので、`prisma.$transaction` で囲む。同じボードのラベルを `count` で数え、送られた ID の数（重なりを除いたもの）と合わなければ 400
 - ラベルやカードを削除したときの中間テーブルの行は、スキーマの `onDelete: Cascade` で DB が消す
 
+## 期限日
+
+- `Card.dueDate` は `String?` で、`"2026-11-05"` のような日付だけの文字列を、変換せずにそのまま保存して返す。`DateTime` にしないので、サーバーのタイムゾーンで日付がずれることがない（理由は [02-data-model.md](02-data-model.md#期限日duedateの持ち方)）
+- 形式の確認（`YYYY-MM-DD` で、実在する日付か）は `updateCardSchema` の `z.iso.date()` が行う。サービスには期限日のための処理はなく、`updateCard` が受け取った項目をそのまま `prisma.card.update` に渡す。`dueDate: null` は Prisma でも「null にする」、省略（`undefined`）は「変えない」になるので、消すときも同じ処理で済む
+- 期限切れかどうかは保存しない。「今日」は見ている人のタイムゾーンで決まるので、画面で判定する
+- `prisma/seed.ts` のサンプルの期限日は、実行した日を基準にする（2日前、3日後、10日後）。いつ実行しても期限切れのカードとまだ先のカードができる
+
 ## shared パッケージ（@kanban/shared）
 
 ```
 shared/src/
 ├── schemas.ts    Zod スキーマと、z.infer で作った型（Board, Column, Card, Label, BoardDetail, 各リクエストの入力）、ラベルの色の一覧
 ├── position.ts   並び順の計算（positionForInsert）
+├── dueDate.ts    期限日の計算（今日の日付を "YYYY-MM-DD" にする toDateString、期限切れの判定 isOverdue）
 └── index.ts
 ```
 

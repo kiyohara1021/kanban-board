@@ -2,13 +2,18 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { loadDb, saveDb } from '@/demo/db'
-import { renderApp, saveSampleBoard } from '@/test/renderApp'
+import { renderApp, saveSampleBoard, setToday } from '@/test/renderApp'
 
 // カード詳細の URL を直接開き、ダイアログが出るまで待つ。
-// withLabel を true にすると、カードにラベル「急ぎ」を付けた状態から始める
-async function openCard({ withLabel = false } = {}) {
+// withLabel を true にすると、カードにラベル「急ぎ」を付けた状態から始める。
+// dueDate を渡すと、カードにその期限日を付けた状態から始める
+async function openCard({ withLabel = false, dueDate = null as string | null } = {}) {
   saveSampleBoard()
   if (withLabel) saveDb({ ...loadDb(), cardLabels: [{ cardId: 'k1', labelId: 'l1' }] })
+  if (dueDate !== null) {
+    const db = loadDb()
+    saveDb({ ...db, cards: db.cards.map((card) => ({ ...card, dueDate })) })
+  }
   const user = userEvent.setup()
   const router = renderApp('/boards/b1/cards/k1')
   await screen.findByRole('dialog', { name: 'カードの編集' })
@@ -144,5 +149,39 @@ describe('カード詳細のラベル', () => {
     // カードの保存を待たずに、すぐ削除される
     await waitFor(() => expect(loadDb().labels).toEqual([]))
     expect(loadDb().cardLabels).toEqual([])
+  })
+})
+
+describe('カード詳細の期限日', () => {
+  it('期限日を入れて保存すると、カードに表示され、日付の文字列で保存される', async () => {
+    setToday(2026, 11, 5)
+    const { user } = await openCard()
+
+    const input = screen.getByLabelText('期限日')
+    expect(input).toHaveValue('')
+    expect(screen.getByRole('button', { name: '期限日を消す' })).toBeDisabled()
+    await user.type(input, '2026-11-20')
+    await user.click(screen.getByRole('button', { name: '保存' }))
+
+    expect(
+      screen.getByRole('button', { name: 'カード「テストを書く」（期限：11月20日）' }),
+    ).toBeInTheDocument()
+    await waitFor(() => expect(loadDb().cards[0]?.dueDate).toBe('2026-11-20'))
+  })
+
+  it('「期限日を消す」を押して保存すると、期限日がなくなる', async () => {
+    setToday(2026, 11, 5)
+    const { user } = await openCard({ dueDate: '2026-11-20' })
+
+    const input = screen.getByLabelText('期限日')
+    expect(input).toHaveValue('2026-11-20')
+    await user.click(screen.getByRole('button', { name: '期限日を消す' }))
+    // ボタンが押せなくなるので、フォーカスは日付の入力欄に移る
+    expect(input).toHaveValue('')
+    expect(input).toHaveFocus()
+    await user.click(screen.getByRole('button', { name: '保存' }))
+
+    expect(screen.getByRole('button', { name: 'カード「テストを書く」' })).toBeInTheDocument()
+    await waitFor(() => expect(loadDb().cards[0]?.dueDate).toBeNull())
   })
 })
