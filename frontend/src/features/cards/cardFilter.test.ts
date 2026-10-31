@@ -12,6 +12,7 @@ function createCard(changes: Partial<Card>): Card {
     description: '',
     position: 1000,
     labelIds: [],
+    dueDate: null,
     createdAt: now,
     updatedAt: now,
     ...changes,

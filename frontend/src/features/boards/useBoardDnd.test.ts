@@ -9,7 +9,7 @@ const now = '2026-11-01T00:00:00.000Z'
 
 function createCard(id: string, position: number, labelIds: string[]): Card {
   const card = { id, columnId: 'column-1', title: id, description: '' }
-  return { ...card, position, labelIds, createdAt: now, updatedAt: now }
+  return { ...card, position, labelIds, dueDate: null, createdAt: now, updatedAt: now }
 }
 
 // A・B・C には「急ぎ」のラベルが付いていて、x と y には付いていない。
