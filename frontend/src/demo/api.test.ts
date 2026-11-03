@@ -102,6 +102,20 @@ describe('デモ版の API', () => {
     expect(titlesOf(api.getBoardDetail(db, board.id).columns)).toEqual(['完了', 'ToDo', '進行中'])
   })
 
+  it('index が並びの数より大きいときは、カードもカラムも末尾に移動する', () => {
+    const board = api.createBoard(db, { title: 'B' })
+    const [todo] = api.getBoardDetail(db, board.id).columns
+    const a = api.createCard(db, todo.id, { title: 'A' })
+    api.createCard(db, todo.id, { title: 'B' })
+
+    api.moveCard(db, a.id, { columnId: todo.id, index: 10 })
+    api.moveColumn(db, todo.id, { index: 10 })
+
+    const detail = api.getBoardDetail(db, board.id)
+    expect(titlesOf(detail.columns)).toEqual(['進行中', '完了', 'ToDo'])
+    expect(titlesOf(detail.columns[2].cards)).toEqual(['B', 'A'])
+  })
+
   it('ボードを削除すると、中のカラム・カード・ラベルも消える', () => {
     const board = api.createBoard(db, { title: 'B' })
     const card = api.createCard(db, api.getBoardDetail(db, board.id).columns[0].id, { title: 'A' })

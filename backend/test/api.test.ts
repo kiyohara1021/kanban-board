@@ -141,6 +141,16 @@ describe('カラム', () => {
     expect(titlesOf((await getBoard(board.id)).columns)).toEqual(['完了', 'ToDo', '進行中'])
   })
 
+  it('index がカラムの数より大きいときは末尾に移動する', async () => {
+    const board = await createBoard()
+    const todo = board.columns[0]
+
+    const res = await api.post(`/api/columns/${todo.id}/move`).send({ index: 10 }).expect(200)
+
+    expect((res.body as Column).position).toBe(4000)
+    expect(titlesOf((await getBoard(board.id)).columns)).toEqual(['進行中', '完了', 'ToDo'])
+  })
+
   it('名前を変更し、削除できる', async () => {
     const board = await createBoard()
     const todo = board.columns[0]
@@ -191,6 +201,21 @@ describe('カード', () => {
     await api.post(`/api/cards/${a.id}/move`).send({ columnId: todo.id, index: 2 }).expect(200)
 
     expect(titlesOf((await getBoard(board.id)).columns[0].cards)).toEqual(['B', 'C', 'A'])
+  })
+
+  it('index がカードの数より大きいときは末尾に移動する', async () => {
+    const board = await createBoard()
+    const todo = board.columns[0]
+    const a = await addCard(todo.id, 'A')
+    await addCard(todo.id, 'B')
+    await addCard(todo.id, 'C')
+
+    await api.post(`/api/cards/${a.id}/move`).send({ columnId: todo.id, index: 10 }).expect(200)
+
+    const cards = (await getBoard(board.id)).columns[0].cards
+    expect(titlesOf(cards)).toEqual(['B', 'C', 'A'])
+    // 先頭のカードと position が重ならない
+    expect(new Set(cards.map((card) => card.position)).size).toBe(3)
   })
 
   it('別のカラムのカードの間に移動する', async () => {
