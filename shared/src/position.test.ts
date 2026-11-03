@@ -16,6 +16,12 @@ describe('positionForInsert', () => {
     expect(positionForInsert(items(1000, 2000), 0).position).toBe(500)
   })
 
+  it('index が並びの数より大きいときは末尾として扱う', () => {
+    const result = positionForInsert(items(1000, 2000, 3000), 10)
+
+    expect(result.position).toBe(4000)
+  })
+
   it('間には前後の中間を返す', () => {
     expect(positionForInsert(items(1000, 2000), 1).position).toBe(1500)
   })

@@ -9,12 +9,14 @@ type Positioned = { position: number }
 
 /**
  * items（移動する要素を除いた並び）の index 番目に入れるときの position を返す。
- * 隙間が狭すぎるときは items を 1000, 2000, 3000… に振り直し、振り直した items も返す
+ * 隙間が狭すぎるときは items を 1000, 2000, 3000… に振り直し、振り直した items も返す。
+ * index が items の数より大きいときは末尾として扱う（先頭のカードと position が重ならないように）
  */
 export function positionForInsert<T extends Positioned>(
   items: T[],
-  index: number,
+  requestedIndex: number,
 ): { items: T[]; position: number } {
+  const index = Math.min(requestedIndex, items.length)
   const prev = items[index - 1]?.position
   const next = items[index]?.position
 
